@@ -1,5 +1,5 @@
 {
-  "name": "virtuals-curve-wasm",
+  "name": "virtuals-curve",
   "collaborators": [
     "Dean Little (@deanmlittle)"
   ],
@@ -8,7 +8,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/blueshift_gg/virtuals-curve"
+    "url": "https://github.com/blueshift-gg/virtuals-curve"
   },
   "files": [
     "virtuals_curve_bg.wasm",

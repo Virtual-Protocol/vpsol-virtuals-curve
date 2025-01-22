@@ -1,11 +1,24 @@
-[profile.release]
-lto = true
+[package]
+name = "virtuals-curve"
+version = "0.1.0"
+authors = ["Dean Little (@deanmlittle)"]
+edition = "2021"
+description = "A Constant Product Curve for the Virtuals launchpad"
+repository = "https://github.com/blueshift-gg/virtuals-curve"
+license = "MIT"
 
-[profile.release.package.anchor-cli]
-codegen-units = 1
+[lib]
+name = "virtuals_curve"
+crate-type = ["cdylib", "lib"]
 
-[workspace]
-members = [
-    "virtuals-curve",
-    "virtuals-curve-wasm",
-]
+[dependencies]
+anchor-lang = { version = "0.30.1", optional = true }
+wasm-bindgen = { version = "0.2.92", optional = true }
+thiserror = "2.0.11"
+anyhow = "1.0.95"
+
+[target.'cfg(target_os = "solana")'.dependencies]
+anchor-lang = { version = "0.30.1" }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen = "0.2.92"

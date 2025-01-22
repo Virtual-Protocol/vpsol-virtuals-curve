@@ -1,3 +1,4 @@
+
 let imports = {};
 imports['__wbindgen_placeholder__'] = module.exports;
 let wasm;
@@ -7,530 +8,206 @@ let cachedTextDecoder = new TextDecoder('utf-8', { ignoreBOM: true, fatal: true 
 
 cachedTextDecoder.decode();
 
-let cachedUint8Memory0 = null;
+let cachedUint8ArrayMemory0 = null;
 
-function getUint8Memory0() {
-    if (cachedUint8Memory0 === null || cachedUint8Memory0.byteLength === 0) {
-        cachedUint8Memory0 = new Uint8Array(wasm.memory.buffer);
+function getUint8ArrayMemory0() {
+    if (cachedUint8ArrayMemory0 === null || cachedUint8ArrayMemory0.byteLength === 0) {
+        cachedUint8ArrayMemory0 = new Uint8Array(wasm.memory.buffer);
     }
-    return cachedUint8Memory0;
+    return cachedUint8ArrayMemory0;
 }
 
 function getStringFromWasm0(ptr, len) {
     ptr = ptr >>> 0;
-    return cachedTextDecoder.decode(getUint8Memory0().subarray(ptr, ptr + len));
+    return cachedTextDecoder.decode(getUint8ArrayMemory0().subarray(ptr, ptr + len));
 }
 
-const heap = new Array(128).fill(undefined);
-
-heap.push(undefined, null, true, false);
-
-let heap_next = heap.length;
-
-function addHeapObject(obj) {
-    if (heap_next === heap.length) heap.push(heap.length + 1);
-    const idx = heap_next;
-    heap_next = heap[idx];
-
-    heap[idx] = obj;
-    return idx;
-}
-
-function getObject(idx) { return heap[idx]; }
-
-function dropObject(idx) {
-    if (idx < 132) return;
-    heap[idx] = heap_next;
-    heap_next = idx;
-}
-
-function takeObject(idx) {
-    const ret = getObject(idx);
-    dropObject(idx);
-    return ret;
-}
-
-function isLikeNone(x) {
-    return x === undefined || x === null;
-}
-
-let cachedInt32Memory0 = null;
-
-function getInt32Memory0() {
-    if (cachedInt32Memory0 === null || cachedInt32Memory0.byteLength === 0) {
-        cachedInt32Memory0 = new Int32Array(wasm.memory.buffer);
-    }
-    return cachedInt32Memory0;
+function takeFromExternrefTable0(idx) {
+    const value = wasm.__wbindgen_export_0.get(idx);
+    wasm.__externref_table_dealloc(idx);
+    return value;
 }
 /**
-*/
-module.exports.LiquidityPair = Object.freeze({ X:0,"0":"X",Y:1,"1":"Y", });
+ * @param {bigint} x
+ * @param {bigint} y
+ * @returns {bigint}
+ */
+module.exports.k_from_xy = function(x, y) {
+    const ret = wasm.k_from_xy(x, y);
+    if (ret[3]) {
+        throw takeFromExternrefTable0(ret[2]);
+    }
+    return (BigInt.asUintN(64, ret[0]) | (BigInt.asUintN(64, ret[1]) << BigInt(64)));
+};
+
 /**
-*/
-module.exports.CurveError = Object.freeze({ InvalidPrecision:0,"0":"InvalidPrecision",Overflow:1,"1":"Overflow",Underflow:2,"2":"Underflow",InvalidFeeAmount:3,"3":"InvalidFeeAmount",InsufficientBalance:4,"4":"InsufficientBalance",ZeroBalance:5,"5":"ZeroBalance",SlippageLimitExceeded:6,"6":"SlippageLimitExceeded", });
+ * @param {bigint} x
+ * @param {bigint} y
+ * @param {number} precision
+ * @returns {bigint}
+ */
+module.exports.spot_price_from_pair = function(x, y, precision) {
+    const ret = wasm.spot_price_from_pair(x, y, precision);
+    if (ret[2]) {
+        throw takeFromExternrefTable0(ret[1]);
+    }
+    return BigInt.asUintN(64, ret[0]);
+};
+
 /**
-*/
-class ConstantProduct {
+ * @param {bigint} x
+ * @param {bigint} y
+ * @param {bigint} a
+ * @returns {bigint}
+ */
+module.exports.x2_from_y_swap_amount = function(x, y, a) {
+    const ret = wasm.x2_from_y_swap_amount(x, y, a);
+    if (ret[2]) {
+        throw takeFromExternrefTable0(ret[1]);
+    }
+    return BigInt.asUintN(64, ret[0]);
+};
 
-    static __wrap(ptr) {
-        ptr = ptr >>> 0;
-        const obj = Object.create(ConstantProduct.prototype);
-        obj.__wbg_ptr = ptr;
-
-        return obj;
-    }
-
-    __destroy_into_raw() {
-        const ptr = this.__wbg_ptr;
-        this.__wbg_ptr = 0;
-
-        return ptr;
-    }
-
-    free() {
-        const ptr = this.__destroy_into_raw();
-        wasm.__wbg_constantproduct_free(ptr);
-    }
-    /**
-    * @param {bigint} x
-    * @param {bigint} y
-    * @param {number} fee
-    * @param {number | undefined} precision
-    */
-    constructor(x, y, fee, precision) {
-        try {
-            const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
-            wasm.constantproduct_init(retptr, x, y, fee, isLikeNone(precision) ? 0xFFFFFF : precision);
-            var r0 = getInt32Memory0()[retptr / 4 + 0];
-            var r1 = getInt32Memory0()[retptr / 4 + 1];
-            var r2 = getInt32Memory0()[retptr / 4 + 2];
-            if (r2) {
-                throw takeObject(r1);
-            }
-            return ConstantProduct.__wrap(r0);
-        } finally {
-            wasm.__wbindgen_add_to_stack_pointer(16);
-        }
-    }
-    /**
-    * @param {bigint} x
-    * @param {bigint} y
-    * @returns {any}
-    */
-    static k_from_xy(x, y) {
-        try {
-            const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
-            wasm.constantproduct_k_from_xy(retptr, x, y);
-            var r0 = getInt32Memory0()[retptr / 4 + 0];
-            var r1 = getInt32Memory0()[retptr / 4 + 1];
-            var r2 = getInt32Memory0()[retptr / 4 + 2];
-            if (r2) {
-                throw takeObject(r1);
-            }
-            return takeObject(r0);
-        } finally {
-            wasm.__wbindgen_add_to_stack_pointer(16);
-        }
-    }
-    /**
-    * @param {bigint} x
-    * @param {bigint} y
-    * @param {number} precision
-    * @returns {SpotPrice}
-    */
-    static spot_price_from_pair(x, y, precision) {
-        try {
-            const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
-            wasm.constantproduct_spot_price_from_pair(retptr, x, y, precision);
-            var r0 = getInt32Memory0()[retptr / 4 + 0];
-            var r1 = getInt32Memory0()[retptr / 4 + 1];
-            var r2 = getInt32Memory0()[retptr / 4 + 2];
-            if (r2) {
-                throw takeObject(r1);
-            }
-            return SpotPrice.__wrap(r0);
-        } finally {
-            wasm.__wbindgen_add_to_stack_pointer(16);
-        }
-    }
-    /**
-    * @param {bigint} x
-    * @param {bigint} y
-    * @param {bigint} a
-    * @returns {any}
-    */
-    static x2_from_y_swap_amount(x, y, a) {
-        try {
-            const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
-            wasm.constantproduct_x2_from_y_swap_amount(retptr, x, y, a);
-            var r0 = getInt32Memory0()[retptr / 4 + 0];
-            var r1 = getInt32Memory0()[retptr / 4 + 1];
-            var r2 = getInt32Memory0()[retptr / 4 + 2];
-            if (r2) {
-                throw takeObject(r1);
-            }
-            return takeObject(r0);
-        } finally {
-            wasm.__wbindgen_add_to_stack_pointer(16);
-        }
-    }
-    /**
-    * @param {bigint} x
-    * @param {bigint} y
-    * @param {bigint} a
-    * @returns {any}
-    */
-    static y2_from_x_swap_amount(x, y, a) {
-        try {
-            const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
-            wasm.constantproduct_y2_from_x_swap_amount(retptr, x, y, a);
-            var r0 = getInt32Memory0()[retptr / 4 + 0];
-            var r1 = getInt32Memory0()[retptr / 4 + 1];
-            var r2 = getInt32Memory0()[retptr / 4 + 2];
-            if (r2) {
-                throw takeObject(r1);
-            }
-            return takeObject(r0);
-        } finally {
-            wasm.__wbindgen_add_to_stack_pointer(16);
-        }
-    }
-    /**
-    * @param {bigint} x
-    * @param {bigint} y
-    * @param {bigint} a
-    * @returns {any}
-    */
-    static delta_x_from_y_swap_amount(x, y, a) {
-        try {
-            const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
-            wasm.constantproduct_delta_x_from_y_swap_amount(retptr, x, y, a);
-            var r0 = getInt32Memory0()[retptr / 4 + 0];
-            var r1 = getInt32Memory0()[retptr / 4 + 1];
-            var r2 = getInt32Memory0()[retptr / 4 + 2];
-            if (r2) {
-                throw takeObject(r1);
-            }
-            return takeObject(r0);
-        } finally {
-            wasm.__wbindgen_add_to_stack_pointer(16);
-        }
-    }
-    /**
-    * @param {bigint} x
-    * @param {bigint} y
-    * @param {bigint} a
-    * @returns {any}
-    */
-    static delta_y_from_x_swap_amount(x, y, a) {
-        try {
-            const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
-            wasm.constantproduct_delta_y_from_x_swap_amount(retptr, x, y, a);
-            var r0 = getInt32Memory0()[retptr / 4 + 0];
-            var r1 = getInt32Memory0()[retptr / 4 + 1];
-            var r2 = getInt32Memory0()[retptr / 4 + 2];
-            if (r2) {
-                throw takeObject(r1);
-            }
-            return takeObject(r0);
-        } finally {
-            wasm.__wbindgen_add_to_stack_pointer(16);
-        }
-    }
-    /**
-    * @returns {any}
-    */
-    k() {
-        try {
-            const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
-            wasm.constantproduct_k(retptr, this.__wbg_ptr);
-            var r0 = getInt32Memory0()[retptr / 4 + 0];
-            var r1 = getInt32Memory0()[retptr / 4 + 1];
-            var r2 = getInt32Memory0()[retptr / 4 + 2];
-            if (r2) {
-                throw takeObject(r1);
-            }
-            return takeObject(r0);
-        } finally {
-            wasm.__wbindgen_add_to_stack_pointer(16);
-        }
-    }
-    /**
-    * @returns {SpotPrice}
-    */
-    spot_price_x() {
-        try {
-            const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
-            wasm.constantproduct_spot_price_x(retptr, this.__wbg_ptr);
-            var r0 = getInt32Memory0()[retptr / 4 + 0];
-            var r1 = getInt32Memory0()[retptr / 4 + 1];
-            var r2 = getInt32Memory0()[retptr / 4 + 2];
-            if (r2) {
-                throw takeObject(r1);
-            }
-            return SpotPrice.__wrap(r0);
-        } finally {
-            wasm.__wbindgen_add_to_stack_pointer(16);
-        }
-    }
-    /**
-    * @returns {SpotPrice}
-    */
-    spot_price_y() {
-        try {
-            const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
-            wasm.constantproduct_spot_price_y(retptr, this.__wbg_ptr);
-            var r0 = getInt32Memory0()[retptr / 4 + 0];
-            var r1 = getInt32Memory0()[retptr / 4 + 1];
-            var r2 = getInt32Memory0()[retptr / 4 + 2];
-            if (r2) {
-                throw takeObject(r1);
-            }
-            return SpotPrice.__wrap(r0);
-        } finally {
-            wasm.__wbindgen_add_to_stack_pointer(16);
-        }
-    }
-    /**
-    * @param {number} p
-    * @param {bigint} a
-    * @returns {SwapResult}
-    */
-    swap_unsafe(p, a) {
-        try {
-            const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
-            wasm.constantproduct_swap_unsafe(retptr, this.__wbg_ptr, p, a);
-            var r0 = getInt32Memory0()[retptr / 4 + 0];
-            var r1 = getInt32Memory0()[retptr / 4 + 1];
-            var r2 = getInt32Memory0()[retptr / 4 + 2];
-            if (r2) {
-                throw takeObject(r1);
-            }
-            return SwapResult.__wrap(r0);
-        } finally {
-            wasm.__wbindgen_add_to_stack_pointer(16);
-        }
-    }
-    /**
-    * @param {number} p
-    * @param {bigint} a
-    * @param {bigint} min
-    * @returns {SwapResult}
-    */
-    swap(p, a, min) {
-        try {
-            const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
-            wasm.constantproduct_swap(retptr, this.__wbg_ptr, p, a, min);
-            var r0 = getInt32Memory0()[retptr / 4 + 0];
-            var r1 = getInt32Memory0()[retptr / 4 + 1];
-            var r2 = getInt32Memory0()[retptr / 4 + 2];
-            if (r2) {
-                throw takeObject(r1);
-            }
-            return SwapResult.__wrap(r0);
-        } finally {
-            wasm.__wbindgen_add_to_stack_pointer(16);
-        }
-    }
-}
-module.exports.ConstantProduct = ConstantProduct;
 /**
-*/
-class SpotPrice {
+ * @param {bigint} x
+ * @param {bigint} y
+ * @param {bigint} a
+ * @returns {bigint}
+ */
+module.exports.y2_from_x_swap_amount = function(x, y, a) {
+    const ret = wasm.y2_from_x_swap_amount(x, y, a);
+    if (ret[2]) {
+        throw takeFromExternrefTable0(ret[1]);
+    }
+    return BigInt.asUintN(64, ret[0]);
+};
 
-    static __wrap(ptr) {
-        ptr = ptr >>> 0;
-        const obj = Object.create(SpotPrice.prototype);
-        obj.__wbg_ptr = ptr;
-
-        return obj;
-    }
-
-    __destroy_into_raw() {
-        const ptr = this.__wbg_ptr;
-        this.__wbg_ptr = 0;
-
-        return ptr;
-    }
-
-    free() {
-        const ptr = this.__destroy_into_raw();
-        wasm.__wbg_spotprice_free(ptr);
-    }
-    /**
-    * @returns {bigint}
-    */
-    get upper() {
-        const ret = wasm.__wbg_get_spotprice_upper(this.__wbg_ptr);
-        return BigInt.asUintN(64, ret);
-    }
-    /**
-    * @param {bigint} arg0
-    */
-    set upper(arg0) {
-        wasm.__wbg_set_spotprice_upper(this.__wbg_ptr, arg0);
-    }
-    /**
-    * @returns {bigint}
-    */
-    get lower() {
-        const ret = wasm.__wbg_get_spotprice_lower(this.__wbg_ptr);
-        return BigInt.asUintN(64, ret);
-    }
-    /**
-    * @param {bigint} arg0
-    */
-    set lower(arg0) {
-        wasm.__wbg_set_spotprice_lower(this.__wbg_ptr, arg0);
-    }
-    /**
-    * @returns {number}
-    */
-    get precision() {
-        const ret = wasm.__wbg_get_spotprice_precision(this.__wbg_ptr);
-        return ret >>> 0;
-    }
-    /**
-    * @param {number} arg0
-    */
-    set precision(arg0) {
-        wasm.__wbg_set_spotprice_precision(this.__wbg_ptr, arg0);
-    }
-    /**
-    * @returns {any}
-    */
-    to_bigint() {
-        const ret = wasm.spotprice_to_bigint(this.__wbg_ptr);
-        return takeObject(ret);
-    }
-}
-module.exports.SpotPrice = SpotPrice;
 /**
-*/
+ * @param {bigint} x
+ * @param {bigint} y
+ * @param {bigint} a
+ * @returns {bigint}
+ */
+module.exports.delta_x_from_y_swap_amount = function(x, y, a) {
+    const ret = wasm.delta_x_from_y_swap_amount(x, y, a);
+    if (ret[2]) {
+        throw takeFromExternrefTable0(ret[1]);
+    }
+    return BigInt.asUintN(64, ret[0]);
+};
+
+/**
+ * @param {bigint} x
+ * @param {bigint} y
+ * @param {bigint} a
+ * @returns {bigint}
+ */
+module.exports.delta_y_from_x_swap_amount = function(x, y, a) {
+    const ret = wasm.delta_y_from_x_swap_amount(x, y, a);
+    if (ret[2]) {
+        throw takeFromExternrefTable0(ret[1]);
+    }
+    return BigInt.asUintN(64, ret[0]);
+};
+
+/**
+ * @param {bigint} x
+ * @param {bigint} y
+ * @param {bigint} a
+ * @param {number} fee
+ * @returns {SwapResult}
+ */
+module.exports.delta_x_from_y_swap_amount_with_fee = function(x, y, a, fee) {
+    const ret = wasm.delta_x_from_y_swap_amount_with_fee(x, y, a, fee);
+    if (ret[2]) {
+        throw takeFromExternrefTable0(ret[1]);
+    }
+    return SwapResult.__wrap(ret[0]);
+};
+
+/**
+ * @param {bigint} x
+ * @param {bigint} y
+ * @param {bigint} a
+ * @param {number} fee
+ * @returns {SwapResult}
+ */
+module.exports.delta_y_from_x_swap_amount_with_fee = function(x, y, a, fee) {
+    const ret = wasm.delta_y_from_x_swap_amount_with_fee(x, y, a, fee);
+    if (ret[2]) {
+        throw takeFromExternrefTable0(ret[1]);
+    }
+    return SwapResult.__wrap(ret[0]);
+};
+
+const SwapResultFinalization = (typeof FinalizationRegistry === 'undefined')
+    ? { register: () => {}, unregister: () => {} }
+    : new FinalizationRegistry(ptr => wasm.__wbg_swapresult_free(ptr >>> 0, 1));
+
 class SwapResult {
 
     static __wrap(ptr) {
         ptr = ptr >>> 0;
         const obj = Object.create(SwapResult.prototype);
         obj.__wbg_ptr = ptr;
-
+        SwapResultFinalization.register(obj, obj.__wbg_ptr, obj);
         return obj;
     }
 
     __destroy_into_raw() {
         const ptr = this.__wbg_ptr;
         this.__wbg_ptr = 0;
-
+        SwapResultFinalization.unregister(this);
         return ptr;
     }
 
     free() {
         const ptr = this.__destroy_into_raw();
-        wasm.__wbg_swapresult_free(ptr);
+        wasm.__wbg_swapresult_free(ptr, 0);
     }
     /**
-    * @returns {bigint}
-    */
-    get deposit() {
-        const ret = wasm.__wbg_get_spotprice_upper(this.__wbg_ptr);
+     * @returns {bigint}
+     */
+    get amount_out() {
+        const ret = wasm.__wbg_get_swapresult_amount_out(this.__wbg_ptr);
         return BigInt.asUintN(64, ret);
     }
     /**
-    * @param {bigint} arg0
-    */
-    set deposit(arg0) {
-        wasm.__wbg_set_spotprice_upper(this.__wbg_ptr, arg0);
+     * @param {bigint} arg0
+     */
+    set amount_out(arg0) {
+        wasm.__wbg_set_swapresult_amount_out(this.__wbg_ptr, arg0);
     }
     /**
-    * @returns {bigint}
-    */
-    get withdraw() {
-        const ret = wasm.__wbg_get_spotprice_lower(this.__wbg_ptr);
-        return BigInt.asUintN(64, ret);
-    }
-    /**
-    * @param {bigint} arg0
-    */
-    set withdraw(arg0) {
-        wasm.__wbg_set_spotprice_lower(this.__wbg_ptr, arg0);
-    }
-    /**
-    * @returns {bigint}
-    */
+     * @returns {bigint}
+     */
     get fee() {
         const ret = wasm.__wbg_get_swapresult_fee(this.__wbg_ptr);
         return BigInt.asUintN(64, ret);
     }
     /**
-    * @param {bigint} arg0
-    */
+     * @param {bigint} arg0
+     */
     set fee(arg0) {
         wasm.__wbg_set_swapresult_fee(this.__wbg_ptr, arg0);
     }
 }
 module.exports.SwapResult = SwapResult;
-/**
-*/
-class XYAmounts {
-
-    __destroy_into_raw() {
-        const ptr = this.__wbg_ptr;
-        this.__wbg_ptr = 0;
-
-        return ptr;
-    }
-
-    free() {
-        const ptr = this.__destroy_into_raw();
-        wasm.__wbg_xyamounts_free(ptr);
-    }
-    /**
-    * @returns {bigint}
-    */
-    get x() {
-        const ret = wasm.__wbg_get_spotprice_upper(this.__wbg_ptr);
-        return BigInt.asUintN(64, ret);
-    }
-    /**
-    * @param {bigint} arg0
-    */
-    set x(arg0) {
-        wasm.__wbg_set_spotprice_upper(this.__wbg_ptr, arg0);
-    }
-    /**
-    * @returns {bigint}
-    */
-    get y() {
-        const ret = wasm.__wbg_get_spotprice_lower(this.__wbg_ptr);
-        return BigInt.asUintN(64, ret);
-    }
-    /**
-    * @param {bigint} arg0
-    */
-    set y(arg0) {
-        wasm.__wbg_set_spotprice_lower(this.__wbg_ptr, arg0);
-    }
-}
-module.exports.XYAmounts = XYAmounts;
-
-module.exports.__wbindgen_bigint_from_str = function(arg0, arg1) {
-    const ret = BigInt(getStringFromWasm0(arg0, arg1));
-    return addHeapObject(ret);
-};
-
-module.exports.__wbindgen_bigint_from_u128 = function(arg0, arg1) {
-    const ret = BigInt.asUintN(64, arg0) << BigInt(64) | BigInt.asUintN(64, arg1);
-    return addHeapObject(ret);
-};
-
-module.exports.__wbindgen_bigint_from_u64 = function(arg0) {
-    const ret = BigInt.asUintN(64, arg0);
-    return addHeapObject(ret);
-};
 
 module.exports.__wbindgen_error_new = function(arg0, arg1) {
     const ret = new Error(getStringFromWasm0(arg0, arg1));
-    return addHeapObject(ret);
+    return ret;
+};
+
+module.exports.__wbindgen_init_externref_table = function() {
+    const table = wasm.__wbindgen_export_0;
+    const offset = table.grow(4);
+    table.set(0, undefined);
+    table.set(offset + 0, undefined);
+    table.set(offset + 1, null);
+    table.set(offset + 2, true);
+    table.set(offset + 3, false);
+    ;
 };
 
 module.exports.__wbindgen_throw = function(arg0, arg1) {
@@ -544,4 +221,6 @@ const wasmModule = new WebAssembly.Module(bytes);
 const wasmInstance = new WebAssembly.Instance(wasmModule, imports);
 wasm = wasmInstance.exports;
 module.exports.__wasm = wasm;
+
+wasm.__wbindgen_start();
 
