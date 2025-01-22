@@ -1,0 +1,20 @@
+{
+  "name": "virtuals-curve-wasm",
+  "collaborators": [
+    "Dean Little (@deanmlittle)"
+  ],
+  "description": "A Constant Product Curve for the Virtuals launchpad",
+  "version": "0.1.0",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/blueshift_gg/virtuals-curve"
+  },
+  "files": [
+    "virtuals_curve_bg.wasm",
+    "virtuals_curve.js",
+    "virtuals_curve.d.ts"
+  ],
+  "main": "virtuals_curve.js",
+  "types": "virtuals_curve.d.ts"
+}

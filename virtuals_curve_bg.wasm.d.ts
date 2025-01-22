@@ -1,0 +1,37 @@
+/* tslint:disable */
+/* eslint-disable */
+export const memory: WebAssembly.Memory;
+export function __wbg_get_spotprice_upper(a: number): number;
+export function __wbg_set_spotprice_upper(a: number, b: number): void;
+export function __wbg_get_spotprice_lower(a: number): number;
+export function __wbg_set_spotprice_lower(a: number, b: number): void;
+export function __wbg_get_spotprice_precision(a: number): number;
+export function __wbg_set_spotprice_precision(a: number, b: number): void;
+export function spotprice_to_bigint(a: number): number;
+export function __wbg_xyamounts_free(a: number): void;
+export function __wbg_get_swapresult_fee(a: number): number;
+export function __wbg_set_swapresult_fee(a: number, b: number): void;
+export function __wbg_constantproduct_free(a: number): void;
+export function constantproduct_init(a: number, b: number, c: number, d: number, e: number): void;
+export function constantproduct_k_from_xy(a: number, b: number, c: number): void;
+export function constantproduct_spot_price_from_pair(a: number, b: number, c: number, d: number): void;
+export function constantproduct_x2_from_y_swap_amount(a: number, b: number, c: number, d: number): void;
+export function constantproduct_y2_from_x_swap_amount(a: number, b: number, c: number, d: number): void;
+export function constantproduct_delta_x_from_y_swap_amount(a: number, b: number, c: number, d: number): void;
+export function constantproduct_delta_y_from_x_swap_amount(a: number, b: number, c: number, d: number): void;
+export function constantproduct_k(a: number, b: number): void;
+export function constantproduct_spot_price_x(a: number, b: number): void;
+export function constantproduct_spot_price_y(a: number, b: number): void;
+export function constantproduct_swap_unsafe(a: number, b: number, c: number, d: number): void;
+export function constantproduct_swap(a: number, b: number, c: number, d: number, e: number): void;
+export function __wbg_get_xyamounts_x(a: number): number;
+export function __wbg_get_xyamounts_y(a: number): number;
+export function __wbg_get_swapresult_deposit(a: number): number;
+export function __wbg_get_swapresult_withdraw(a: number): number;
+export function __wbg_swapresult_free(a: number): void;
+export function __wbg_spotprice_free(a: number): void;
+export function __wbg_set_xyamounts_x(a: number, b: number): void;
+export function __wbg_set_xyamounts_y(a: number, b: number): void;
+export function __wbg_set_swapresult_deposit(a: number, b: number): void;
+export function __wbg_set_swapresult_withdraw(a: number, b: number): void;
+export function __wbindgen_add_to_stack_pointer(a: number): number;

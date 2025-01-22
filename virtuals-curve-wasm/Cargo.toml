@@ -1,0 +1,16 @@
+[package]
+name = "virtuals-curve-wasm"
+version = "0.1.0"
+authors = ["Dean Little (@deanmlittle)"]
+edition = "2021"
+description = "A Constant Product Curve for the Virtuals launchpad"
+repository = "https://github.com/blueshift_gg/virtuals-curve"
+license = "MIT"
+
+[lib]
+name = "virtuals_curve"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+virtuals-curve = { path="../virtuals-curve" }
+wasm-bindgen = "0.2.86"
