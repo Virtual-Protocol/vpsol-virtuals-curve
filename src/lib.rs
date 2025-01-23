@@ -136,8 +136,11 @@ mod tests {
 
     #[test]
     fn swap_with_fee() {
-        let SwapResult { amount_out, fee } = sell_token_with_fee(20, 30, 5, 2000).unwrap();
+        let SwapResult { amount_out, fee } = sell_token_with_fee(20, 30, 5, 1667).unwrap();
         assert_eq!(amount_out, 5);
         assert_eq!(fee, 1);
+        let SwapResult { amount_out, fee } = sell_token_with_fee(20, 30, 5, 1666).unwrap();
+        assert_eq!(amount_out, 6);
+        assert_eq!(fee, 0);
     }
 }
