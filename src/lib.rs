@@ -54,16 +54,6 @@ pub fn x2_from_y_swap_amount(x: u64, y: u64, a: u64) -> Result<u64> {
     Ok(k.checked_div(x_new).ok_or(CurveError::ArithmeticOverflow)? as u64)
 }
 
-// Calculate new value of Y₂ after depositing X
-// When we swap amount A of X for Y, we must calculate the new balance of Y from invariant K
-// X₂ = X₁ + Amount
-// Y₂ = K / X₂
-#[inline]
-#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
-pub fn y2_from_x_swap_amount(x: u64, y: u64, a: u64) -> Result<u64> {
-    x2_from_y_swap_amount(y,x,a)
-}
-
 // Calculate the withdraw amount of X from swapping in Y
 // ΔX = X₁ - X₂
 #[inline]
@@ -80,40 +70,73 @@ pub fn delta_y_from_x_swap_amount(x: u64, y: u64, a: u64) -> Result<u64> {
     delta_x_from_y_swap_amount(y,x,a)
 }
 
-// Calculate the withdraw amount of X from swapping in Y
-// ΔX = X₁ - X₂
 #[inline]
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
-pub fn delta_x_from_y_swap_amount_with_fee(x: u64, y: u64, a: u64, fee: u16) -> Result<SwapResult> {
-    let raw_amount = x.checked_sub(x2_from_y_swap_amount(x,y,a)?).ok_or(CurveError::ArithmeticOverflow)?;
-    let amount = raw_amount.checked_mul((10_000 - fee).into()).ok_or(CurveError::ArithmeticOverflow)?.saturating_div(10_000);
-    Ok(SwapResult { amount_out: raw_amount, fee: raw_amount - amount })
+pub fn calculate_fee(amount: u64, fee: u16) -> Result<u64> {
+    let fee: u64 = (amount as u128)
+        .checked_mul(fee as u128).ok_or(CurveError::ArithmeticOverflow)?
+        .saturating_div(10_000u128)
+        .try_into()
+        .map_err(|_| CurveError::ArithmeticOverflow)?;
+    Ok(fee)
+}
+
+// Calculate the withdraw amount of X from swapping in Y minus a fee
+// ΔX = X₁ - X₂
+//
+// For a buy, we take the fee out of the virtuals amount in before performing the invariant conversion.
+#[inline]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
+pub fn buy_token_with_fee(token_balance: u64, virtuals_balance: u64, virtuals_amount_in: u64, fee: u16) -> Result<SwapResult> {
+    // The fee, payable in VIRTUALS, calculated from virtuals amount in
+    let fee = calculate_fee(virtuals_amount_in, fee)?;
+
+    // Amount in minus the fee
+    let amount_in_minus_fee = virtuals_amount_in.saturating_sub(fee);
+
+    // Then we calculate the fee ΔX from making our swap
+    let amount_out = delta_x_from_y_swap_amount(token_balance,virtuals_balance, amount_in_minus_fee)?;
+    Ok(SwapResult { amount_out, fee })
 }
 
 // Calculate difference in Y from swapping in X
 // ΔY = Y₁ - Y₂ 
+//
+// For a sell, we first perform the invariant conversion, then take the fee out of the result virtuals amount.
 #[inline]
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
-pub fn delta_y_from_x_swap_amount_with_fee(x: u64, y: u64, a: u64, fee: u16) -> Result<SwapResult> {
-    delta_x_from_y_swap_amount_with_fee(y,x,a, fee)
+pub fn sell_token_with_fee(token_balance: u64, virtuals_balance: u64, token_amount_in: u64, fee: u16) -> Result<SwapResult> {
+    // The amount of VIRTUALS tokens for the amount of TOKEN sold
+    let virtuals_amount_out = delta_x_from_y_swap_amount(virtuals_balance,token_balance, token_amount_in)?;
+    
+    // The fee, payable in VIRTUALS, calculated from virtuals amount out
+    let fee = calculate_fee(virtuals_amount_out, fee)?;
+    
+    // The fee, payable in VIRTUALS, deducted from amount out
+    let amount_out = virtuals_amount_out.saturating_sub(fee);
+    
+    Ok(SwapResult {
+        amount_out,
+        fee,
+    })
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::{delta_y_from_x_swap_amount_with_fee, SwapResult};
+    use crate::{buy_token_with_fee, sell_token_with_fee, SwapResult};
     #[test]
     fn swap() {
-        let SwapResult { amount_out, fee } = delta_y_from_x_swap_amount_with_fee(20, 30, 5, 0).unwrap();
+        let SwapResult { amount_out, fee } = buy_token_with_fee(30, 20, 5, 0).unwrap();
         assert_eq!(amount_out, 6);
         assert_eq!(fee, 0);
-        let SwapResult { amount_out, fee } = delta_y_from_x_swap_amount_with_fee(25, 24, 5, 0).unwrap();
+        let SwapResult { amount_out, fee } = buy_token_with_fee(24, 25, 5, 0).unwrap();
         assert_eq!(amount_out, 4);
         assert_eq!(fee, 0);
     }
 
     #[test]
     fn swap_with_fee() {
-        let SwapResult { amount_out, fee } = delta_y_from_x_swap_amount_with_fee(20, 30, 5, 100).unwrap();
+        let SwapResult { amount_out, fee } = sell_token_with_fee(20, 30, 5, 2000).unwrap();
         assert_eq!(amount_out, 5);
         assert_eq!(fee, 1);
     }

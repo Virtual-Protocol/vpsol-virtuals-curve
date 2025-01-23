@@ -11,14 +11,15 @@ license = "MIT"
 name = "virtuals_curve"
 crate-type = ["cdylib", "lib"]
 
+[features]
+default = []
+anchor = ["anchor-lang"]
+
 [dependencies]
 anchor-lang = { version = "0.30.1", optional = true }
 wasm-bindgen = { version = "0.2.92", optional = true }
 thiserror = "2.0.11"
 anyhow = "1.0.95"
-
-[target.'cfg(target_os = "solana")'.dependencies]
-anchor-lang = { version = "0.30.1" }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 wasm-bindgen = "0.2.92"

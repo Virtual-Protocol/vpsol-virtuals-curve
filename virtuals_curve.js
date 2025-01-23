@@ -74,20 +74,6 @@ module.exports.x2_from_y_swap_amount = function(x, y, a) {
  * @param {bigint} a
  * @returns {bigint}
  */
-module.exports.y2_from_x_swap_amount = function(x, y, a) {
-    const ret = wasm.y2_from_x_swap_amount(x, y, a);
-    if (ret[2]) {
-        throw takeFromExternrefTable0(ret[1]);
-    }
-    return BigInt.asUintN(64, ret[0]);
-};
-
-/**
- * @param {bigint} x
- * @param {bigint} y
- * @param {bigint} a
- * @returns {bigint}
- */
 module.exports.delta_x_from_y_swap_amount = function(x, y, a) {
     const ret = wasm.delta_x_from_y_swap_amount(x, y, a);
     if (ret[2]) {
@@ -111,14 +97,27 @@ module.exports.delta_y_from_x_swap_amount = function(x, y, a) {
 };
 
 /**
- * @param {bigint} x
- * @param {bigint} y
- * @param {bigint} a
+ * @param {bigint} amount
+ * @param {number} fee
+ * @returns {bigint}
+ */
+module.exports.calculate_fee = function(amount, fee) {
+    const ret = wasm.calculate_fee(amount, fee);
+    if (ret[2]) {
+        throw takeFromExternrefTable0(ret[1]);
+    }
+    return BigInt.asUintN(64, ret[0]);
+};
+
+/**
+ * @param {bigint} token_balance
+ * @param {bigint} virtuals_balance
+ * @param {bigint} virtuals_amount_in
  * @param {number} fee
  * @returns {SwapResult}
  */
-module.exports.delta_x_from_y_swap_amount_with_fee = function(x, y, a, fee) {
-    const ret = wasm.delta_x_from_y_swap_amount_with_fee(x, y, a, fee);
+module.exports.buy_token_with_fee = function(token_balance, virtuals_balance, virtuals_amount_in, fee) {
+    const ret = wasm.buy_token_with_fee(token_balance, virtuals_balance, virtuals_amount_in, fee);
     if (ret[2]) {
         throw takeFromExternrefTable0(ret[1]);
     }
@@ -126,14 +125,14 @@ module.exports.delta_x_from_y_swap_amount_with_fee = function(x, y, a, fee) {
 };
 
 /**
- * @param {bigint} x
- * @param {bigint} y
- * @param {bigint} a
+ * @param {bigint} token_balance
+ * @param {bigint} virtuals_balance
+ * @param {bigint} token_amount_in
  * @param {number} fee
  * @returns {SwapResult}
  */
-module.exports.delta_y_from_x_swap_amount_with_fee = function(x, y, a, fee) {
-    const ret = wasm.delta_y_from_x_swap_amount_with_fee(x, y, a, fee);
+module.exports.sell_token_with_fee = function(token_balance, virtuals_balance, token_amount_in, fee) {
+    const ret = wasm.sell_token_with_fee(token_balance, virtuals_balance, token_amount_in, fee);
     if (ret[2]) {
         throw takeFromExternrefTable0(ret[1]);
     }
