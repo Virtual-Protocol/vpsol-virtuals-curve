@@ -191,12 +191,13 @@ export function sellTokenWithFee(token_balance, virtuals_balance, sell_amount, f
 }
 
 /**
- * @enum {0 | 1 | 2}
+ * @enum {0 | 1 | 2 | 3}
  */
 export const CurveError = Object.freeze({
     ArithmeticOverflow: 0, "0": "ArithmeticOverflow",
     RatioExceeded: 1, "1": "RatioExceeded",
     InvalidSupply: 2, "2": "InvalidSupply",
+    ZeroAmount: 3, "3": "ZeroAmount",
 });
 
 const SwapResultFinalization = (typeof FinalizationRegistry === 'undefined')

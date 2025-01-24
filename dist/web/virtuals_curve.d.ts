@@ -12,6 +12,7 @@ export enum CurveError {
   ArithmeticOverflow = 0,
   RatioExceeded = 1,
   InvalidSupply = 2,
+  ZeroAmount = 3,
 }
 export class SwapResult {
   private constructor();
