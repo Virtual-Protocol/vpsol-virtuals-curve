@@ -4,7 +4,11 @@ export function __wbg_set_wasm(val) {
 }
 
 
-let WASM_VECTOR_LEN = 0;
+const lTextDecoder = typeof TextDecoder === 'undefined' ? (0, module.require)('util').TextDecoder : TextDecoder;
+
+let cachedTextDecoder = new lTextDecoder('utf-8', { ignoreBOM: true, fatal: true });
+
+cachedTextDecoder.decode();
 
 let cachedUint8ArrayMemory0 = null;
 
@@ -14,6 +18,13 @@ function getUint8ArrayMemory0() {
     }
     return cachedUint8ArrayMemory0;
 }
+
+function getStringFromWasm0(ptr, len) {
+    ptr = ptr >>> 0;
+    return cachedTextDecoder.decode(getUint8ArrayMemory0().subarray(ptr, ptr + len));
+}
+
+let WASM_VECTOR_LEN = 0;
 
 const lTextEncoder = typeof TextEncoder === 'undefined' ? (0, module.require)('util').TextEncoder : TextEncoder;
 
@@ -80,53 +91,26 @@ function getDataViewMemory0() {
     return cachedDataViewMemory0;
 }
 
-const lTextDecoder = typeof TextDecoder === 'undefined' ? (0, module.require)('util').TextDecoder : TextDecoder;
-
-let cachedTextDecoder = new lTextDecoder('utf-8', { ignoreBOM: true, fatal: true });
-
-cachedTextDecoder.decode();
-
-function getStringFromWasm0(ptr, len) {
-    ptr = ptr >>> 0;
-    return cachedTextDecoder.decode(getUint8ArrayMemory0().subarray(ptr, ptr + len));
+export function init() {
+    wasm.init();
 }
 
 function takeFromExternrefTable0(idx) {
-    const value = wasm.__wbindgen_export_2.get(idx);
+    const value = wasm.__wbindgen_export_3.get(idx);
     wasm.__externref_table_dealloc(idx);
     return value;
 }
 /**
- * K from XY
- *
- * Our static invariant calculation
  * @param {bigint} x
  * @param {bigint} y
  * @returns {bigint}
  */
-export function k_from_xy(x, y) {
-    const ret = wasm.k_from_xy(x, y);
-    if (ret[3]) {
-        throw takeFromExternrefTable0(ret[2]);
-    }
-    return (BigInt.asUintN(64, ret[0]) | (BigInt.asUintN(64, ret[1]) << BigInt(64)));
-}
-
-/**
- * # Spot Price
- *
- * Calculate spot price for a token in its opposing token
- * @param {bigint} x
- * @param {bigint} y
- * @param {number} precision
- * @returns {bigint}
- */
-export function spot_price_from_pair(x, y, precision) {
-    const ret = wasm.spot_price_from_pair(x, y, precision);
+export function kFromXY(x, y) {
+    const ret = wasm.kFromXY(x, y);
     if (ret[2]) {
         throw takeFromExternrefTable0(ret[1]);
     }
-    return BigInt.asUintN(64, ret[0]);
+    return takeFromExternrefTable0(ret[0]);
 }
 
 /**
@@ -134,23 +118,22 @@ export function spot_price_from_pair(x, y, precision) {
  * @param {number} fee
  * @returns {bigint}
  */
-export function calculate_fee(amount, fee) {
-    const ret = wasm.calculate_fee(amount, fee);
+export function calculateFee(amount, fee) {
+    const ret = wasm.calculateFee(amount, fee);
     if (ret[2]) {
         throw takeFromExternrefTable0(ret[1]);
     }
-    return BigInt.asUintN(64, ret[0]);
+    return takeFromExternrefTable0(ret[0]);
 }
 
 /**
- * @param {bigint} token_balance
- * @param {bigint} virtuals_balance
- * @param {bigint} sell_amount
- * @param {number} fee_bp
- * @returns {any}
+ * @param {bigint} x
+ * @param {bigint} y
+ * @param {number} precision
+ * @returns {bigint}
  */
-export function sell_token_with_fee(token_balance, virtuals_balance, sell_amount, fee_bp) {
-    const ret = wasm.sell_token_with_fee(token_balance, virtuals_balance, sell_amount, fee_bp);
+export function spotPrice(x, y, precision) {
+    const ret = wasm.spotPrice(x, y, precision);
     if (ret[2]) {
         throw takeFromExternrefTable0(ret[1]);
     }
@@ -161,15 +144,58 @@ export function sell_token_with_fee(token_balance, virtuals_balance, sell_amount
  * @param {bigint} token_balance
  * @param {bigint} virtuals_balance
  * @param {bigint} buy_amount
- * @param {number} fee_bp
- * @returns {any}
+ * @returns {bigint}
  */
-export function buy_token_with_fee(token_balance, virtuals_balance, buy_amount, fee_bp) {
-    const ret = wasm.buy_token_with_fee(token_balance, virtuals_balance, buy_amount, fee_bp);
+export function buyToken(token_balance, virtuals_balance, buy_amount) {
+    const ret = wasm.buyToken(token_balance, virtuals_balance, buy_amount);
     if (ret[2]) {
         throw takeFromExternrefTable0(ret[1]);
     }
     return takeFromExternrefTable0(ret[0]);
+}
+
+/**
+ * @param {bigint} token_balance
+ * @param {bigint} virtuals_balance
+ * @param {bigint} sell_amount
+ * @returns {bigint}
+ */
+export function sellToken(token_balance, virtuals_balance, sell_amount) {
+    const ret = wasm.sellToken(token_balance, virtuals_balance, sell_amount);
+    if (ret[2]) {
+        throw takeFromExternrefTable0(ret[1]);
+    }
+    return takeFromExternrefTable0(ret[0]);
+}
+
+/**
+ * @param {bigint} token_balance
+ * @param {bigint} virtuals_balance
+ * @param {bigint} buy_amount
+ * @param {number} fee
+ * @returns {SwapResult}
+ */
+export function buyTokenWithFee(token_balance, virtuals_balance, buy_amount, fee) {
+    const ret = wasm.buyTokenWithFee(token_balance, virtuals_balance, buy_amount, fee);
+    if (ret[2]) {
+        throw takeFromExternrefTable0(ret[1]);
+    }
+    return SwapResult.__wrap(ret[0]);
+}
+
+/**
+ * @param {bigint} token_balance
+ * @param {bigint} virtuals_balance
+ * @param {bigint} sell_amount
+ * @param {number} fee
+ * @returns {SwapResult}
+ */
+export function sellTokenWithFee(token_balance, virtuals_balance, sell_amount, fee) {
+    const ret = wasm.sellTokenWithFee(token_balance, virtuals_balance, sell_amount, fee);
+    if (ret[2]) {
+        throw takeFromExternrefTable0(ret[1]);
+    }
+    return SwapResult.__wrap(ret[0]);
 }
 
 /**
@@ -186,6 +212,14 @@ const SwapResultFinalization = (typeof FinalizationRegistry === 'undefined')
     : new FinalizationRegistry(ptr => wasm.__wbg_swapresult_free(ptr >>> 0, 1));
 
 export class SwapResult {
+
+    static __wrap(ptr) {
+        ptr = ptr >>> 0;
+        const obj = Object.create(SwapResult.prototype);
+        obj.__wbg_ptr = ptr;
+        SwapResultFinalization.register(obj, obj.__wbg_ptr, obj);
+        return obj;
+    }
 
     __destroy_into_raw() {
         const ptr = this.__wbg_ptr;
@@ -239,21 +273,34 @@ export class SwapResult {
     }
 }
 
-export function __wbg_String_8f0eb39a4a4c2f66(arg0, arg1) {
-    const ret = String(arg1);
+export function __wbg_error_7534b8e9a36f1ab4(arg0, arg1) {
+    let deferred0_0;
+    let deferred0_1;
+    try {
+        deferred0_0 = arg0;
+        deferred0_1 = arg1;
+        console.error(getStringFromWasm0(arg0, arg1));
+    } finally {
+        wasm.__wbindgen_free(deferred0_0, deferred0_1, 1);
+    }
+};
+
+export function __wbg_new_8a6f238a6ece86ea() {
+    const ret = new Error();
+    return ret;
+};
+
+export function __wbg_stack_0ed75d68575b0f3c(arg0, arg1) {
+    const ret = arg1.stack;
     const ptr1 = passStringToWasm0(ret, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
     const len1 = WASM_VECTOR_LEN;
     getDataViewMemory0().setInt32(arg0 + 4 * 1, len1, true);
     getDataViewMemory0().setInt32(arg0 + 4 * 0, ptr1, true);
 };
 
-export function __wbg_new_405e22f390576ce2() {
-    const ret = new Object();
+export function __wbindgen_bigint_from_u128(arg0, arg1) {
+    const ret = BigInt.asUintN(64, arg0) << BigInt(64) | BigInt.asUintN(64, arg1);
     return ret;
-};
-
-export function __wbg_set_3f1d0b984ed272ed(arg0, arg1, arg2) {
-    arg0[arg1] = arg2;
 };
 
 export function __wbindgen_bigint_from_u64(arg0) {
@@ -267,7 +314,7 @@ export function __wbindgen_error_new(arg0, arg1) {
 };
 
 export function __wbindgen_init_externref_table() {
-    const table = wasm.__wbindgen_export_2;
+    const table = wasm.__wbindgen_export_3;
     const offset = table.grow(4);
     table.set(0, undefined);
     table.set(offset + 0, undefined);
@@ -279,11 +326,6 @@ export function __wbindgen_init_externref_table() {
 
 export function __wbindgen_number_new(arg0) {
     const ret = arg0;
-    return ret;
-};
-
-export function __wbindgen_string_new(arg0, arg1) {
-    const ret = getStringFromWasm0(arg0, arg1);
     return ret;
 };
 

@@ -1692,8 +1692,10 @@ dependencies = [
  "anchor-lang",
  "anyhow",
  "console_error_panic_hook",
+ "js-sys",
  "serde",
  "serde-wasm-bindgen",
+ "serde_derive",
  "thiserror 2.0.11",
  "wasm-bindgen",
 ]

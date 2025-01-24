@@ -10,14 +10,8 @@ extern crate console_error_panic_hook;
 #[cfg(target_arch = "wasm32")]
 use std::panic;
 
-#[cfg(target_arch = "wasm32")]
-pub type Result<T> = std::result::Result<T, JsError>;
-
-#[cfg(not(target_arch = "wasm32"))]
-pub type Result<T> = std::result::Result<T, CurveError>;
-
 #[derive(Debug)]
-#[cfg_attr(target_arch = "wasm32", wasm_bindgen, derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(target_arch = "wasm32", derive(serde::Serialize, serde::Deserialize), wasm_bindgen)]
 pub struct SwapResult {
     pub total: u64,
     pub amount: u64,
@@ -50,6 +44,7 @@ impl From<CurveError> for Error {
 
 
 #[cfg(target_arch = "wasm32")]
+#[wasm_bindgen(start)]
 fn init() {
     panic::set_hook(Box::new(console_error_panic_hook::hook));
 }
@@ -58,8 +53,7 @@ fn init() {
 /// 
 /// Our static invariant calculation
 #[inline]
-#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
-pub fn k_from_xy(x: u64, y: u64) -> Result<u128> {
+pub fn k_from_xy_impl(x: u64, y: u64) -> Result<u128, CurveError> {
     assert_ne!(x, 0);
     assert_ne!(y, 0);
     Ok((x as u128).checked_mul(y as u128).ok_or(CurveError::ArithmeticOverflow)?)
@@ -69,8 +63,7 @@ pub fn k_from_xy(x: u64, y: u64) -> Result<u128> {
 /// 
 /// Calculate spot price for a token in its opposing token
 #[inline]
-#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
-pub fn spot_price_from_pair(x: u64, y: u64, precision: u32) -> Result<u64> {
+fn spot_price_impl(x: u64, y: u64, precision: u32) -> Result<u64, CurveError> {
     assert_ne!(x, 0);
     assert_ne!(y, 0);
     Ok(
@@ -87,9 +80,9 @@ pub fn spot_price_from_pair(x: u64, y: u64, precision: u32) -> Result<u64> {
 /// 
 /// Calculate amount of virtuals needed to buy tokens using constant product formula
 #[inline]
-pub fn buy_token(token_balance: u64, virtuals_balance: u64, buy_amount: u64) -> Result<u64> {
+fn buy_token_impl(token_balance: u64, virtuals_balance: u64, buy_amount: u64) -> Result<u64, CurveError> {
     // 1. We start from K = XY (Constant = Token x Virtuals)
-    let k = k_from_xy(token_balance, virtuals_balance)?;
+    let k = k_from_xy_impl(token_balance, virtuals_balance)?;
     // 2. We calculate the new balance of X (Tokens)
     let new_token_balance = token_balance.checked_sub(buy_amount).ok_or(CurveError::ArithmeticOverflow)? as u128;
     // 3. We calculate the new balance of Y (Virtuals)
@@ -102,9 +95,9 @@ pub fn buy_token(token_balance: u64, virtuals_balance: u64, buy_amount: u64) -> 
 /// 
 /// Calculate amount of virtuals received when selling tokens using constant product formula
 #[inline]
-pub fn sell_token(token_balance: u64, virtuals_balance: u64, sell_amount: u64) -> Result<u64> {
+fn sell_token_impl(token_balance: u64, virtuals_balance: u64, sell_amount: u64) -> Result<u64, CurveError> {
     // 1. We start from K = XY (Constant = Token x Virtuals)
-    let k = k_from_xy(token_balance, virtuals_balance)?;
+    let k = k_from_xy_impl(token_balance, virtuals_balance)?;
     // 2. We calculate the new balance of X (Tokens)
     let new_token_balance = token_balance.checked_add(sell_amount).ok_or(CurveError::ArithmeticOverflow)? as u128;
     // 3. We calculate the new balance of Y (Virtuals)
@@ -116,10 +109,8 @@ pub fn sell_token(token_balance: u64, virtuals_balance: u64, sell_amount: u64) -
     virtuals_balance.checked_sub(new_virtuals_balance).ok_or(CurveError::ArithmeticOverflow.into())
 }
 
-
 #[inline]
-#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
-pub fn calculate_fee(amount: u64, fee: u16) -> Result<u64> {
+fn calculate_fee_impl(amount: u64, fee: u16) -> Result<u64, CurveError> {
     let fee: u64 = (amount as u128)
         .checked_mul(fee as u128).ok_or(CurveError::ArithmeticOverflow)?
         .saturating_div(10_000u128)
@@ -132,9 +123,9 @@ pub fn calculate_fee(amount: u64, fee: u16) -> Result<u64> {
 /// 
 /// Calculate the amount, fee and total in virtuals a user must pay to buy a certain amount of tokens
 #[inline]
-pub fn buy_token_with_fee_impl(token_balance: u64, virtuals_balance: u64, buy_amount: u64, fee_bp: u16) -> Result<SwapResult> {
-    let amount = buy_token(token_balance, virtuals_balance, buy_amount)?;
-    let fee = calculate_fee(amount, fee_bp)?;
+fn buy_token_with_fee_impl(token_balance: u64, virtuals_balance: u64, buy_amount: u64, fee_bp: u16) -> Result<SwapResult, CurveError> {
+    let amount = buy_token_impl(token_balance, virtuals_balance, buy_amount)?;
+    let fee = calculate_fee_impl(amount, fee_bp)?;
     let total = amount.checked_add(fee).ok_or(CurveError::ArithmeticOverflow)?;
     Ok(SwapResult { amount, fee, total })
 }
@@ -143,35 +134,91 @@ pub fn buy_token_with_fee_impl(token_balance: u64, virtuals_balance: u64, buy_am
 /// 
 /// Calculate the amount, fee and total in virtuals a user will receive for selling a certain amount of tokens
 #[inline]
-pub fn sell_token_with_fee_impl(token_balance: u64, virtuals_balance: u64, sell_amount: u64, fee_bp: u16) -> Result<SwapResult> {
-    let total = sell_token(token_balance, virtuals_balance, sell_amount)?;
-    let fee = calculate_fee(total, fee_bp)?;
+fn sell_token_with_fee_impl(token_balance: u64, virtuals_balance: u64, sell_amount: u64, fee_bp: u16) -> Result<SwapResult, CurveError> {
+    let total = sell_token_impl(token_balance, virtuals_balance, sell_amount)?;
+    let fee = calculate_fee_impl(total, fee_bp)?;
     let amount = total.checked_sub(fee).ok_or(CurveError::ArithmeticOverflow)?;
     Ok(SwapResult { amount, fee, total })
 }
 
-#[cfg(target_arch="wasm32")]
-#[wasm_bindgen]
-pub fn sell_token_with_fee(token_balance: u64, virtuals_balance: u64, sell_amount: u64, fee_bp: u16) -> Result<JsValue> {
-    Ok(serde_wasm_bindgen::to_value(&sell_token_with_fee_impl(token_balance, virtuals_balance, sell_amount, fee_bp)?)?)
+// Native interfaces
+#[cfg(not(target_arch = "wasm32"))]
+pub fn k_from_xy(x: u64, y: u64) -> Result<u128, CurveError> {
+    k_from_xy_impl(x, y)
 }
 
-#[cfg(not(target_arch="wasm32"))]
-pub fn sell_token_with_fee(token_balance: u64, virtuals_balance: u64, sell_amount: u64, fee_bp: u16) -> Result<SwapResult> {
-    sell_token_with_fee_impl(token_balance, virtuals_balance, sell_amount, fee_bp)
+#[cfg(not(target_arch = "wasm32"))]
+pub fn calculate_fee(amount: u64, fee: u16) -> Result<u64, CurveError> {
+    calculate_fee_impl(amount, fee)
 }
 
-#[cfg(target_arch="wasm32")]
-#[wasm_bindgen]
-pub fn buy_token_with_fee(token_balance: u64, virtuals_balance: u64, buy_amount: u64, fee_bp: u16) -> Result<JsValue> {
-    Ok(serde_wasm_bindgen::to_value(&buy_token_with_fee_impl(token_balance, virtuals_balance, buy_amount, fee_bp)?)?)
+#[cfg(not(target_arch = "wasm32"))]
+pub fn spot_price(x: u64, y: u64, precision: u32) -> Result<u64, CurveError> {
+    spot_price_impl(x, y, precision)
 }
 
-#[cfg(not(target_arch="wasm32"))]
-pub fn buy_token_with_fee(token_balance: u64, virtuals_balance: u64, buy_amount: u64, fee_bp: u16) -> Result<SwapResult> {
-    buy_token_with_fee_impl(token_balance, virtuals_balance, buy_amount, fee_bp)
+#[cfg(not(target_arch = "wasm32"))]
+pub fn buy_token(token_balance: u64, virtuals_balance: u64, buy_amount: u64) -> Result<u64, CurveError> {
+    buy_token_impl(token_balance, virtuals_balance, buy_amount)
 }
 
+#[cfg(not(target_arch = "wasm32"))]
+pub fn sell_token(token_balance: u64, virtuals_balance: u64, sell_amount: u64) -> Result<u64, CurveError> {
+    sell_token_impl(token_balance, virtuals_balance, sell_amount)
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+pub fn buy_token_with_fee(token_balance: u64, virtuals_balance: u64, buy_amount: u64, fee: u16) -> Result<SwapResult, CurveError> {
+    buy_token_with_fee_impl(token_balance, virtuals_balance, buy_amount, fee)
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+pub fn sell_token_with_fee(token_balance: u64, virtuals_balance: u64, sell_amount: u64, fee: u16) -> Result<SwapResult, CurveError> {
+    sell_token_with_fee_impl(token_balance, virtuals_balance, sell_amount, fee)
+}
+
+// Wasm interfaces
+#[cfg(target_arch = "wasm32")]
+#[wasm_bindgen(js_name = kFromXY)]
+pub fn k_from_xy(x: u64, y: u64) -> Result<js_sys::BigInt, JsError> {
+    Ok(k_from_xy_impl(x, y).map_err(|e| JsError::new(&e.to_string()))?.into())
+}
+
+#[cfg(target_arch = "wasm32")]
+#[wasm_bindgen(js_name = calculateFee)]
+pub fn calculate_fee(amount: u64, fee: u16) -> Result<js_sys::BigInt, JsError> {
+    Ok(calculate_fee_impl(amount, fee).map_err(|e| JsError::new(&e.to_string()))?.into())
+}
+
+#[cfg(target_arch = "wasm32")]
+#[wasm_bindgen(js_name = spotPrice)]
+pub fn spot_price(x: u64, y: u64, precision: u32) -> Result<js_sys::BigInt, CurveError> {
+    Ok(spot_price_impl(x, y, precision)?.into())
+}
+
+#[cfg(target_arch = "wasm32")]
+#[wasm_bindgen(js_name = buyToken)]
+pub fn buy_token(token_balance: u64, virtuals_balance: u64, buy_amount: u64) -> Result<js_sys::BigInt, JsError> {
+    Ok(buy_token_impl(token_balance, virtuals_balance, buy_amount).map_err(|e| JsError::new(&e.to_string()))?.into())
+}
+
+#[cfg(target_arch = "wasm32")]
+#[wasm_bindgen(js_name = sellToken)]
+pub fn sell_token(token_balance: u64, virtuals_balance: u64, sell_amount: u64) -> Result<js_sys::BigInt, JsError> {
+    Ok(sell_token_impl(token_balance, virtuals_balance, sell_amount).map_err(|e| JsError::new(&e.to_string()))?.into())
+}
+
+#[cfg(target_arch = "wasm32")]
+#[wasm_bindgen(js_name = buyTokenWithFee)]
+pub fn buy_token_with_fee(token_balance: u64, virtuals_balance: u64, buy_amount: u64, fee: u16) -> Result<SwapResult, JsError> {
+    buy_token_with_fee_impl(token_balance, virtuals_balance, buy_amount, fee).map_err(|e| JsError::new(&e.to_string()))
+}
+
+#[cfg(target_arch = "wasm32")]
+#[wasm_bindgen(js_name = sellTokenWithFee)]
+pub fn sell_token_with_fee(token_balance: u64, virtuals_balance: u64, sell_amount: u64, fee: u16) -> Result<SwapResult, JsError> {
+    sell_token_with_fee_impl(token_balance, virtuals_balance, sell_amount, fee).map_err(|e| JsError::new(&e.to_string()))
+}
 
 #[cfg(test)]
 mod tests {
@@ -180,8 +227,6 @@ mod tests {
    #[test]
    fn test_base_swaps() {
        assert_eq!(buy_token_with_fee(30, 20, 5, 0).unwrap().total, 6);
-    //    assert_eq!(buy_token(25, 24, 5).unwrap(), 4);
-    //    assert_eq!(sell_token(20, 30, 5).unwrap(), 6);
    }
 
    #[cfg(test)]

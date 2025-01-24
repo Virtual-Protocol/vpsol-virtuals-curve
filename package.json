@@ -6,9 +6,9 @@
   "description": "A Constant Product Curve for the Virtuals launchpad",
   "version": "0.1.0",
   "license": "MIT",
-  "main": "dist/node/fox_curve.js",
-  "browser": "dist/browser/fox_curve.js",
-  "types": "dist/node/fox_curve.d.ts",
+  "main": "dist/node/virtuals_curve.js",
+  "browser": "dist/browser/virtuals_curve.js",
+  "types": "dist/node/virtuals_curve.d.ts",
   "scripts": {
     "test": "mocha tests/**/*.spec.ts"
   },
