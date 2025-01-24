@@ -27,6 +27,8 @@ pub enum CurveError {
     RatioExceeded,
     #[error("Invalid Supply")]
     InvalidSupply,
+    #[error("Zero Amount")]
+    ZeroAmount
 }
 
 #[cfg(feature = "anchor")]
@@ -88,7 +90,13 @@ fn buy_token_impl(token_balance: u64, virtuals_balance: u64, buy_amount: u64) ->
     // 3. We calculate the new balance of Y (Virtuals)
     let new_virtuals_balance: u64 = k.checked_div(new_token_balance).ok_or(CurveError::ArithmeticOverflow)?.try_into().map_err(|_| CurveError::ArithmeticOverflow)?;
     // 4. Return our amount by subtracting new_virtuals_balance from old.
-    new_virtuals_balance.checked_sub(virtuals_balance).ok_or(CurveError::ArithmeticOverflow.into())
+    let amount = new_virtuals_balance.checked_sub(virtuals_balance).ok_or(CurveError::ArithmeticOverflow.into())?;
+
+    if amount < 1 {
+        return Err(CurveError::ZeroAmount)
+    }
+
+    Ok(amount)
 }
 
 /// # Sell Token
@@ -106,7 +114,13 @@ fn sell_token_impl(token_balance: u64, virtuals_balance: u64, sell_amount: u64) 
         .try_into()
         .map_err(|_| CurveError::ArithmeticOverflow)?;
     // 4. Return our amount by subtracting new_virtuals_balance from old.
-    virtuals_balance.checked_sub(new_virtuals_balance).ok_or(CurveError::ArithmeticOverflow.into())
+    let amount = virtuals_balance.checked_sub(new_virtuals_balance).ok_or(CurveError::ArithmeticOverflow.into())?;
+
+    if amount < 1 {
+        return Err(CurveError::ZeroAmount)
+    }
+    
+    Ok(amount)
 }
 
 #[inline]
