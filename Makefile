@@ -1,2 +1,11 @@
-make:
-	wasm-pack build --out-dir pkg --release --target nodejs && rm -f pkg/README.md pkg/.gitignore && mv pkg/* . && rm -rf pkg
+build:
+	make node; make bundler; make web
+node:
+	wasm-pack build --release --no-pack --out-dir dist/node --target nodejs
+	rm dist/node/.gitignore
+bundler:
+	wasm-pack build --release --no-pack --out-dir dist/bundler --target bundler
+	rm dist/bundler/.gitignore
+web:
+	wasm-pack build --release --no-pack --out-dir dist/web --target web
+	rm dist/web/.gitignore

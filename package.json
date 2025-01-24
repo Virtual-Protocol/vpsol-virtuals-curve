@@ -6,15 +6,31 @@
   "description": "A Constant Product Curve for the Virtuals launchpad",
   "version": "0.1.0",
   "license": "MIT",
+  "main": "dist/node/fox_curve.js",
+  "browser": "dist/browser/fox_curve.js",
+  "types": "dist/node/fox_curve.d.ts",
+  "scripts": {
+    "test": "mocha tests/**/*.spec.ts"
+  },
+  "mocha": {
+    "node-option": [
+      "import=tsx"
+    ]
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/blueshift-gg/virtuals-curve"
   },
   "files": [
-    "virtuals_curve_bg.wasm",
-    "virtuals_curve.js",
-    "virtuals_curve.d.ts"
+    "dist"
   ],
-  "main": "virtuals_curve.js",
-  "types": "virtuals_curve.d.ts"
+  "devDependencies": {
+    "@types/chai": "4.3.17",
+    "@types/mocha": "10.0.7",
+    "@types/node": "^22.4.1",
+    "chai": "^5.1.1",
+    "mocha": "^10.7.3",
+    "ts-mocha": "^10.0.0",
+    "tsx": "^4.17.0"
+  }
 }
