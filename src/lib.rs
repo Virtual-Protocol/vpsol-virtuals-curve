@@ -1,23 +1,52 @@
+use thiserror::Error;
+
+#[cfg(feature = "anchor")]
+use anchor_lang::error::{AnchorError, Error, ERROR_CODE_OFFSET};
+
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
 
 #[cfg(target_arch = "wasm32")]
-pub type Result<T> = anyhow::Result<T, JsError>;
+pub type Result<T> = std::result::Result<T, JsError>;
 
 #[cfg(not(target_arch = "wasm32"))]
-pub type Result<T> = anyhow::Result<T, CurveError>;
-
-pub mod errors;
-use errors::*;
+pub type Result<T> = std::result::Result<T, CurveError>;
 
 #[derive(Debug)]
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 pub struct SwapResult {
-    pub amount_out: u64,
+    pub total: u64,
+    pub amount: u64,
     pub fee: u64
 }
 
-// Static Invariant calculationy
+#[derive(Debug, Error)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
+pub enum CurveError {
+    #[error("Curve Arithmetic Overflow")]
+    ArithmeticOverflow,
+    #[error("Asset Ratio Exceeded")]
+    RatioExceeded,
+    #[error("Invalid Supply")]
+    InvalidSupply,
+}
+
+#[cfg(feature = "anchor")]
+impl From<CurveError> for Error {
+    fn from(value: CurveError) -> Error {
+        Error::AnchorError(Box::new(AnchorError {
+            error_name: value.to_string(),
+            error_msg: value.to_string(),
+            error_code_number: ERROR_CODE_OFFSET + 1000 + value as u32,
+            error_origin: None,
+            compared_values: None,
+        }))
+    }
+}
+
+/// K from XY
+/// 
+/// Our static invariant calculation
 #[inline]
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 pub fn k_from_xy(x: u64, y: u64) -> Result<u128> {
@@ -26,7 +55,9 @@ pub fn k_from_xy(x: u64, y: u64) -> Result<u128> {
     Ok((x as u128).checked_mul(y as u128).ok_or(CurveError::ArithmeticOverflow)?)
 }
 
-// Get spot price for a token in its opposing token
+/// # Spot Price
+/// 
+/// Calculate spot price for a token in its opposing token
 #[inline]
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 pub fn spot_price_from_pair(x: u64, y: u64, precision: u32) -> Result<u64> {
@@ -42,33 +73,39 @@ pub fn spot_price_from_pair(x: u64, y: u64, precision: u32) -> Result<u64> {
     )
 }
 
-// Calculate new value of X after depositing Y
-// When we swap amount A of Y for X, we must calculate the new balance of X from invariant K
-// Y₂ = Y₁ + Amount
-// X₂ = K / Y₂
+/// # Buy Token
+/// 
+/// Calculate amount of virtuals needed to buy tokens using constant product formula
 #[inline]
-#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
-pub fn x2_from_y_swap_amount(x: u64, y: u64, a: u64) -> Result<u64> {
-    let k = k_from_xy(x, y)?;
-    let x_new = (y as u128).checked_add(a as u128).ok_or(CurveError::ArithmeticOverflow)?;
-    Ok(k.checked_div(x_new).ok_or(CurveError::ArithmeticOverflow)? as u64)
+pub fn buy_token(token_balance: u64, virtuals_balance: u64, buy_amount: u64) -> Result<u64> {
+    // 1. We start from K = XY (Constant = Token x Virtuals)
+    let k = k_from_xy(token_balance, virtuals_balance)?;
+    // 2. We calculate the new balance of X (Tokens)
+    let new_token_balance = token_balance.checked_sub(buy_amount).ok_or(CurveError::ArithmeticOverflow)? as u128;
+    // 3. We calculate the new balance of Y (Virtuals)
+    let new_virtuals_balance: u64 = k.checked_div(new_token_balance).ok_or(CurveError::ArithmeticOverflow)?.try_into().map_err(|_| CurveError::ArithmeticOverflow)?;
+    // 4. Return our amount by subtracting new_virtuals_balance from old.
+    new_virtuals_balance.checked_sub(virtuals_balance).ok_or(CurveError::ArithmeticOverflow.into())
 }
 
-// Calculate the withdraw amount of X from swapping in Y
-// ΔX = X₁ - X₂
+/// # Sell Token
+/// 
+/// Calculate amount of virtuals received when selling tokens using constant product formula
 #[inline]
-#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
-pub fn delta_x_from_y_swap_amount(x: u64, y: u64, a: u64) -> Result<u64> {
-    Ok(x.checked_sub(x2_from_y_swap_amount(x,y,a)?).ok_or(CurveError::ArithmeticOverflow)?)
+pub fn sell_token(token_balance: u64, virtuals_balance: u64, sell_amount: u64) -> Result<u64> {
+    // 1. We start from K = XY (Constant = Token x Virtuals)
+    let k = k_from_xy(token_balance, virtuals_balance)?;
+    // 2. We calculate the new balance of X (Tokens)
+    let new_token_balance = token_balance.checked_add(sell_amount).ok_or(CurveError::ArithmeticOverflow)? as u128;
+    // 3. We calculate the new balance of Y (Virtuals)
+    let new_virtuals_balance: u64 = k.checked_div(new_token_balance)
+        .ok_or(CurveError::ArithmeticOverflow)?
+        .try_into()
+        .map_err(|_| CurveError::ArithmeticOverflow)?;
+    // 4. Return our amount by subtracting new_virtuals_balance from old.
+    virtuals_balance.checked_sub(new_virtuals_balance).ok_or(CurveError::ArithmeticOverflow.into())
 }
 
-// Calculate difference in Y from swapping in X
-// ΔY = Y₁ - Y₂ 
-#[inline]
-#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
-pub fn delta_y_from_x_swap_amount(x: u64, y: u64, a: u64) -> Result<u64> {
-    delta_x_from_y_swap_amount(y,x,a)
-}
 
 #[inline]
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
@@ -81,66 +118,93 @@ pub fn calculate_fee(amount: u64, fee: u16) -> Result<u64> {
     Ok(fee)
 }
 
-// Calculate the withdraw amount of X from swapping in Y minus a fee
-// ΔX = X₁ - X₂
-//
-// For a buy, we take the fee out of the virtuals amount in before performing the invariant conversion.
+/// # Buy Token With Fee
+/// 
+/// Calculate the amount, fee and total in virtuals a user must pay to buy a certain amount of tokens
 #[inline]
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
-pub fn buy_token_with_fee(token_balance: u64, virtuals_balance: u64, virtuals_amount_in: u64, fee: u16) -> Result<SwapResult> {
-    // The fee, payable in VIRTUALS, calculated from virtuals amount in
-    let fee = calculate_fee(virtuals_amount_in, fee)?;
+pub fn buy_token_with_fee(token_balance: u64, virtuals_balance: u64, buy_amount: u64, fee_bp: u16) -> Result<SwapResult> {
+    let amount = buy_token(token_balance, virtuals_balance, buy_amount)?;
+    let fee = calculate_fee(amount, fee_bp)?;
+    let total = amount.checked_add(fee).ok_or(CurveError::ArithmeticOverflow)?;
 
-    // Amount in minus the fee
-    let amount_in_minus_fee = virtuals_amount_in.saturating_sub(fee);
-
-    // Then we calculate the fee ΔX from making our swap
-    let amount_out = delta_x_from_y_swap_amount(token_balance,virtuals_balance, amount_in_minus_fee)?;
-    Ok(SwapResult { amount_out, fee })
+    Ok(SwapResult { amount, fee, total })
 }
 
-// Calculate difference in Y from swapping in X
-// ΔY = Y₁ - Y₂ 
-//
-// For a sell, we first perform the invariant conversion, then take the fee out of the result virtuals amount.
+/// # Sell Token With Fee
+/// 
+/// Calculate the amount, fee and total in virtuals a user will receive for selling a certain amount of tokens
 #[inline]
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
-pub fn sell_token_with_fee(token_balance: u64, virtuals_balance: u64, token_amount_in: u64, fee: u16) -> Result<SwapResult> {
-    // The amount of VIRTUALS tokens for the amount of TOKEN sold
-    let virtuals_amount_out = delta_x_from_y_swap_amount(virtuals_balance,token_balance, token_amount_in)?;
-    
-    // The fee, payable in VIRTUALS, calculated from virtuals amount out
-    let fee = calculate_fee(virtuals_amount_out, fee)?;
-    
-    // The fee, payable in VIRTUALS, deducted from amount out
-    let amount_out = virtuals_amount_out.saturating_sub(fee);
-    
-    Ok(SwapResult {
-        amount_out,
-        fee,
-    })
+pub fn sell_token_with_fee(token_balance: u64, virtuals_balance: u64, sell_amount: u64, fee_bp: u16) -> Result<SwapResult> {
+    let total = sell_token(token_balance, virtuals_balance, sell_amount)?;
+    let fee = calculate_fee(total, fee_bp)?;
+    let amount = total.checked_sub(fee).ok_or(CurveError::ArithmeticOverflow)?;
+
+    Ok(SwapResult { amount, fee, total })
 }
 
 #[cfg(test)]
 mod tests {
+   use super::*;
+
+   #[test]
+   fn test_base_swaps() {
+       assert_eq!(buy_token_with_fee(30, 20, 5, 0).unwrap().total, 6);
+    //    assert_eq!(buy_token(25, 24, 5).unwrap(), 4);
+    //    assert_eq!(sell_token(20, 30, 5).unwrap(), 6);
+   }
+
+   #[cfg(test)]
+mod tests {
     use crate::{buy_token_with_fee, sell_token_with_fee, SwapResult};
     #[test]
     fn swap() {
-        let SwapResult { amount_out, fee } = buy_token_with_fee(30, 20, 5, 0).unwrap();
-        assert_eq!(amount_out, 6);
-        assert_eq!(fee, 0);
-        let SwapResult { amount_out, fee } = buy_token_with_fee(24, 25, 5, 0).unwrap();
-        assert_eq!(amount_out, 4);
-        assert_eq!(fee, 0);
+        // Execute a buy
+        // K = XY,
+        // 600 = 30/20
+        // X2 = 25
+        // Y2 = 600/25 = 24
+        // Y2 - Y = 4
+        let SwapResult { amount, ..} = buy_token_with_fee(30, 20, 5, 0).unwrap();
+        assert_eq!(amount, 4);
+        // Execute the reverse sell
+        // K = XY,
+        // 600 = 25/24
+        // X2 = 30
+        // Y2 = 600/30 = 20
+        // Y2 - Y = 4
+        let SwapResult { amount, ..} = sell_token_with_fee(25, 24, 5, 0).unwrap();
+        assert_eq!(amount, 4);
     }
 
     #[test]
     fn swap_with_fee() {
-        let SwapResult { amount_out, fee } = sell_token_with_fee(20, 30, 5, 1667).unwrap();
-        assert_eq!(amount_out, 5);
+        // Execute a sell
+        // K = XY,
+        // 600 = 20/30
+        // X2 = 25
+        // Y2 = 600/25 = 24
+        // Y - Y2 = 6
+        // 6 * 1667 / 10000 = 1
+        let SwapResult { amount, fee, .. } = sell_token_with_fee(20, 30, 5, 1667).unwrap();
+        assert_eq!(amount, 5);
         assert_eq!(fee, 1);
-        let SwapResult { amount_out, fee } = sell_token_with_fee(20, 30, 5, 1666).unwrap();
-        assert_eq!(amount_out, 6);
+        // Execute a sell
+        // K = XY,
+        // 600 = 20/30
+        // X2 = 25
+        // Y2 = 600/25 = 24
+        // Y - Y2 = 6
+        // 6 * 1666 / 10000 = 0
+        let SwapResult { amount, fee, .. } = sell_token_with_fee(20, 30, 5, 1666).unwrap();
+        assert_eq!(amount, 6);
         assert_eq!(fee, 0);
     }
+}
+
+   #[test]
+   fn test_overflow() {
+       assert!(buy_token(u64::MAX, u64::MAX, u64::MAX).is_err());
+   }
 }

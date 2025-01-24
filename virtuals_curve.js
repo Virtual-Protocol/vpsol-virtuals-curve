@@ -28,6 +28,9 @@ function takeFromExternrefTable0(idx) {
     return value;
 }
 /**
+ * K from XY
+ *
+ * Our static invariant calculation
  * @param {bigint} x
  * @param {bigint} y
  * @returns {bigint}
@@ -41,6 +44,9 @@ module.exports.k_from_xy = function(x, y) {
 };
 
 /**
+ * # Spot Price
+ *
+ * Calculate spot price for a token in its opposing token
  * @param {bigint} x
  * @param {bigint} y
  * @param {number} precision
@@ -48,48 +54,6 @@ module.exports.k_from_xy = function(x, y) {
  */
 module.exports.spot_price_from_pair = function(x, y, precision) {
     const ret = wasm.spot_price_from_pair(x, y, precision);
-    if (ret[2]) {
-        throw takeFromExternrefTable0(ret[1]);
-    }
-    return BigInt.asUintN(64, ret[0]);
-};
-
-/**
- * @param {bigint} x
- * @param {bigint} y
- * @param {bigint} a
- * @returns {bigint}
- */
-module.exports.x2_from_y_swap_amount = function(x, y, a) {
-    const ret = wasm.x2_from_y_swap_amount(x, y, a);
-    if (ret[2]) {
-        throw takeFromExternrefTable0(ret[1]);
-    }
-    return BigInt.asUintN(64, ret[0]);
-};
-
-/**
- * @param {bigint} x
- * @param {bigint} y
- * @param {bigint} a
- * @returns {bigint}
- */
-module.exports.delta_x_from_y_swap_amount = function(x, y, a) {
-    const ret = wasm.delta_x_from_y_swap_amount(x, y, a);
-    if (ret[2]) {
-        throw takeFromExternrefTable0(ret[1]);
-    }
-    return BigInt.asUintN(64, ret[0]);
-};
-
-/**
- * @param {bigint} x
- * @param {bigint} y
- * @param {bigint} a
- * @returns {bigint}
- */
-module.exports.delta_y_from_x_swap_amount = function(x, y, a) {
-    const ret = wasm.delta_y_from_x_swap_amount(x, y, a);
     if (ret[2]) {
         throw takeFromExternrefTable0(ret[1]);
     }
@@ -110,14 +74,17 @@ module.exports.calculate_fee = function(amount, fee) {
 };
 
 /**
+ * # Buy Token With Fee
+ *
+ * Calculate the amount, fee and total in virtuals a user must pay to buy a certain amount of tokens
  * @param {bigint} token_balance
  * @param {bigint} virtuals_balance
- * @param {bigint} virtuals_amount_in
- * @param {number} fee
+ * @param {bigint} buy_amount
+ * @param {number} fee_bp
  * @returns {SwapResult}
  */
-module.exports.buy_token_with_fee = function(token_balance, virtuals_balance, virtuals_amount_in, fee) {
-    const ret = wasm.buy_token_with_fee(token_balance, virtuals_balance, virtuals_amount_in, fee);
+module.exports.buy_token_with_fee = function(token_balance, virtuals_balance, buy_amount, fee_bp) {
+    const ret = wasm.buy_token_with_fee(token_balance, virtuals_balance, buy_amount, fee_bp);
     if (ret[2]) {
         throw takeFromExternrefTable0(ret[1]);
     }
@@ -125,19 +92,31 @@ module.exports.buy_token_with_fee = function(token_balance, virtuals_balance, vi
 };
 
 /**
+ * # Sell Token With Fee
+ *
+ * Calculate the amount, fee and total in virtuals a user will receive for selling a certain amount of tokens
  * @param {bigint} token_balance
  * @param {bigint} virtuals_balance
- * @param {bigint} token_amount_in
- * @param {number} fee
+ * @param {bigint} sell_amount
+ * @param {number} fee_bp
  * @returns {SwapResult}
  */
-module.exports.sell_token_with_fee = function(token_balance, virtuals_balance, token_amount_in, fee) {
-    const ret = wasm.sell_token_with_fee(token_balance, virtuals_balance, token_amount_in, fee);
+module.exports.sell_token_with_fee = function(token_balance, virtuals_balance, sell_amount, fee_bp) {
+    const ret = wasm.sell_token_with_fee(token_balance, virtuals_balance, sell_amount, fee_bp);
     if (ret[2]) {
         throw takeFromExternrefTable0(ret[1]);
     }
     return SwapResult.__wrap(ret[0]);
 };
+
+/**
+ * @enum {0 | 1 | 2}
+ */
+module.exports.CurveError = Object.freeze({
+    ArithmeticOverflow: 0, "0": "ArithmeticOverflow",
+    RatioExceeded: 1, "1": "RatioExceeded",
+    InvalidSupply: 2, "2": "InvalidSupply",
+});
 
 const SwapResultFinalization = (typeof FinalizationRegistry === 'undefined')
     ? { register: () => {}, unregister: () => {} }
@@ -167,15 +146,28 @@ class SwapResult {
     /**
      * @returns {bigint}
      */
-    get amount_out() {
-        const ret = wasm.__wbg_get_swapresult_amount_out(this.__wbg_ptr);
+    get total() {
+        const ret = wasm.__wbg_get_swapresult_total(this.__wbg_ptr);
         return BigInt.asUintN(64, ret);
     }
     /**
      * @param {bigint} arg0
      */
-    set amount_out(arg0) {
-        wasm.__wbg_set_swapresult_amount_out(this.__wbg_ptr, arg0);
+    set total(arg0) {
+        wasm.__wbg_set_swapresult_total(this.__wbg_ptr, arg0);
+    }
+    /**
+     * @returns {bigint}
+     */
+    get amount() {
+        const ret = wasm.__wbg_get_swapresult_amount(this.__wbg_ptr);
+        return BigInt.asUintN(64, ret);
+    }
+    /**
+     * @param {bigint} arg0
+     */
+    set amount(arg0) {
+        wasm.__wbg_set_swapresult_amount(this.__wbg_ptr, arg0);
     }
     /**
      * @returns {bigint}
