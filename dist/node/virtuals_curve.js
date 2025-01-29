@@ -123,13 +123,27 @@ module.exports.calculateFee = function(amount, fee) {
 };
 
 /**
- * @param {bigint} x
- * @param {bigint} y
+ * @param {bigint} token_balance
+ * @param {bigint} virtuals_balance
  * @param {number} precision
  * @returns {bigint}
  */
-module.exports.spotPrice = function(x, y, precision) {
-    const ret = wasm.spotPrice(x, y, precision);
+module.exports.spotPriceToken = function(token_balance, virtuals_balance, precision) {
+    const ret = wasm.spotPriceToken(token_balance, virtuals_balance, precision);
+    if (ret[2]) {
+        throw takeFromExternrefTable0(ret[1]);
+    }
+    return takeFromExternrefTable0(ret[0]);
+};
+
+/**
+ * @param {bigint} token_balance
+ * @param {bigint} virtuals_balance
+ * @param {number} precision
+ * @returns {bigint}
+ */
+module.exports.spotPriceVirtuals = function(token_balance, virtuals_balance, precision) {
+    const ret = wasm.spotPriceVirtuals(token_balance, virtuals_balance, precision);
     if (ret[2]) {
         throw takeFromExternrefTable0(ret[1]);
     }
@@ -195,6 +209,36 @@ module.exports.sellTokenWithFee = function(token_balance, virtuals_balance, sell
 };
 
 /**
+ * @param {bigint} token_balance
+ * @param {bigint} virtuals_balance
+ * @param {bigint} buy_amount
+ * @param {number} fee
+ * @returns {SwapResult}
+ */
+module.exports.reverseBuyTokenWithFee = function(token_balance, virtuals_balance, buy_amount, fee) {
+    const ret = wasm.reverseBuyTokenWithFee(token_balance, virtuals_balance, buy_amount, fee);
+    if (ret[2]) {
+        throw takeFromExternrefTable0(ret[1]);
+    }
+    return SwapResult.__wrap(ret[0]);
+};
+
+/**
+ * @param {bigint} token_balance
+ * @param {bigint} virtuals_balance
+ * @param {bigint} sell_amount
+ * @param {number} fee
+ * @returns {SwapResult}
+ */
+module.exports.reverseSellTokenWithFee = function(token_balance, virtuals_balance, sell_amount, fee) {
+    const ret = wasm.reverseSellTokenWithFee(token_balance, virtuals_balance, sell_amount, fee);
+    if (ret[2]) {
+        throw takeFromExternrefTable0(ret[1]);
+    }
+    return SwapResult.__wrap(ret[0]);
+};
+
+/**
  * @enum {0 | 1 | 2 | 3}
  */
 module.exports.CurveError = Object.freeze({
@@ -232,41 +276,54 @@ class SwapResult {
     /**
      * @returns {bigint}
      */
-    get total() {
-        const ret = wasm.__wbg_get_swapresult_total(this.__wbg_ptr);
+    get virtuals_amount() {
+        const ret = wasm.__wbg_get_swapresult_virtuals_amount(this.__wbg_ptr);
         return BigInt.asUintN(64, ret);
     }
     /**
      * @param {bigint} arg0
      */
-    set total(arg0) {
-        wasm.__wbg_set_swapresult_total(this.__wbg_ptr, arg0);
+    set virtuals_amount(arg0) {
+        wasm.__wbg_set_swapresult_virtuals_amount(this.__wbg_ptr, arg0);
     }
     /**
      * @returns {bigint}
      */
-    get amount() {
-        const ret = wasm.__wbg_get_swapresult_amount(this.__wbg_ptr);
+    get token_amount() {
+        const ret = wasm.__wbg_get_swapresult_token_amount(this.__wbg_ptr);
         return BigInt.asUintN(64, ret);
     }
     /**
      * @param {bigint} arg0
      */
-    set amount(arg0) {
-        wasm.__wbg_set_swapresult_amount(this.__wbg_ptr, arg0);
+    set token_amount(arg0) {
+        wasm.__wbg_set_swapresult_token_amount(this.__wbg_ptr, arg0);
     }
     /**
      * @returns {bigint}
      */
-    get fee() {
-        const ret = wasm.__wbg_get_swapresult_fee(this.__wbg_ptr);
+    get fee_amount() {
+        const ret = wasm.__wbg_get_swapresult_fee_amount(this.__wbg_ptr);
         return BigInt.asUintN(64, ret);
     }
     /**
      * @param {bigint} arg0
      */
-    set fee(arg0) {
-        wasm.__wbg_set_swapresult_fee(this.__wbg_ptr, arg0);
+    set fee_amount(arg0) {
+        wasm.__wbg_set_swapresult_fee_amount(this.__wbg_ptr, arg0);
+    }
+    /**
+     * @returns {bigint}
+     */
+    get total_virtuals_amount() {
+        const ret = wasm.__wbg_get_swapresult_total_virtuals_amount(this.__wbg_ptr);
+        return BigInt.asUintN(64, ret);
+    }
+    /**
+     * @param {bigint} arg0
+     */
+    set total_virtuals_amount(arg0) {
+        wasm.__wbg_set_swapresult_total_virtuals_amount(this.__wbg_ptr, arg0);
     }
 }
 module.exports.SwapResult = SwapResult;
