@@ -86,14 +86,19 @@ fn spot_price_impl(x: u64, y: u64, precision: u32) -> Result<u64, CurveError> {
 /// Calculate amount of virtuals needed to buy tokens using constant product formula
 #[inline]
 fn buy_token_impl(token_balance: u64, virtuals_balance: u64, buy_amount: u64) -> Result<u64, CurveError> {
-    // 1. We start from K = XY (Constant = Token x Virtuals)
-    let k = k_from_xy_impl(token_balance, virtuals_balance)?;
-    // 2. We calculate the new balance of X (Tokens)
-    let new_token_balance = token_balance.checked_sub(buy_amount).ok_or(CurveError::ArithmeticOverflow)? as u128;
-    // 3. We calculate the new balance of Y (Virtuals)
-    let new_virtuals_balance: u64 = k.checked_div(new_token_balance).ok_or(CurveError::ArithmeticOverflow)?.try_into().map_err(|_| CurveError::ArithmeticOverflow)?;
-    // 4. Return our amount by subtracting new_virtuals_balance from old.
-    let amount = new_virtuals_balance.checked_sub(virtuals_balance).ok_or(CurveError::ArithmeticOverflow.into())?;
+    if buy_amount >= token_balance {
+        return Err(CurveError::ArithmeticOverflow);
+    }
+    
+    let numerator = (virtuals_balance as u128).checked_mul(buy_amount as u128)
+        .ok_or(CurveError::ArithmeticOverflow)?;
+    let denominator = token_balance.checked_sub(buy_amount)
+        .ok_or(CurveError::ArithmeticOverflow)? as u128;
+    
+    let amount = numerator.checked_div(denominator)
+        .ok_or(CurveError::ArithmeticOverflow)?;
+        
+    let amount: u64 = amount.try_into().map_err(|_| CurveError::ArithmeticOverflow)?;
 
     if amount < 1 {
         return Err(CurveError::ZeroAmount)
@@ -128,17 +133,25 @@ fn reverse_buy_token_impl(token_balance: u64, virtuals_balance: u64, buy_amount:
 /// Calculate amount of virtuals received when selling tokens using constant product formula
 #[inline]
 fn sell_token_impl(token_balance: u64, virtuals_balance: u64, sell_amount: u64) -> Result<u64, CurveError> {
-    // 1. We start from K = XY (Constant = Token x Virtuals)
-    let k = k_from_xy_impl(token_balance, virtuals_balance)?;
-    // 2. We calculate the new balance of X (Tokens)
-    let new_token_balance = token_balance.checked_add(sell_amount).ok_or(CurveError::ArithmeticOverflow)? as u128;
-    // 3. We calculate the new balance of Y (Virtuals)
-    let new_virtuals_balance: u64 = k.checked_div(new_token_balance)
-        .ok_or(CurveError::ArithmeticOverflow)?
-        .try_into()
-        .map_err(|_| CurveError::ArithmeticOverflow)?;
-    // 4. Return our amount by subtracting new_virtuals_balance from old.
-    let amount = virtuals_balance.checked_sub(new_virtuals_balance).ok_or(CurveError::ArithmeticOverflow.into())?;
+
+    let numerator = (virtuals_balance as u128).checked_mul(sell_amount as u128)
+        .ok_or(CurveError::ArithmeticOverflow)?;
+    let denominator = (token_balance as u128).checked_add(sell_amount as u128)
+        .ok_or(CurveError::ArithmeticOverflow)?;
+    
+    let amount = numerator.checked_div(denominator)
+        .ok_or(CurveError::ArithmeticOverflow)? as u64;
+    // // 1. We start from K = XY (Constant = Token x Virtuals)
+    // let k = k_from_xy_impl(token_balance, virtuals_balance)?;
+    // // 2. We calculate the new balance of X (Tokens)
+    // let new_token_balance = token_balance.checked_add(sell_amount).ok_or(CurveError::ArithmeticOverflow)? as u128;
+    // // 3. We calculate the new balance of Y (Virtuals)
+    // let new_virtuals_balance: u64 = k.checked_div(new_token_balance)
+    //     .ok_or(CurveError::ArithmeticOverflow)?
+    //     .try_into()
+    //     .map_err(|_| CurveError::ArithmeticOverflow)?;
+    // // 4. Return our amount by subtracting new_virtuals_balance from old.
+    // let amount = virtuals_balance.checked_sub(new_virtuals_balance).ok_or(CurveError::ArithmeticOverflow.into())?;
 
     if amount < 1 {
         return Err(CurveError::ZeroAmount)
@@ -421,6 +434,10 @@ mod tests {
 
     #[test]
     fn test_real_pool_values() {
-        let val = buy_token_with_fee(1_000_000_000_000_000_000, 6_000_000_000, 125_000_000_000_000_000, 100).unwrap();
+        let buy = buy_token_with_fee(1_000_000_000_000_000, 6_000_000_000_000, 20000000000000, 100).unwrap();
+        println!("{:#?}", buy);
+        let sell = sell_token_with_fee(980_000_000_000_000, 6_000_000_000_000 + buy.virtuals_amount, 20000000000000, 100).unwrap();
+        println!("{:#?}", sell);
+        assert_eq!(buy.virtuals_amount, sell.total_virtuals_amount)
     }
 }
