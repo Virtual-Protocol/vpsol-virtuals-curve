@@ -115,25 +115,22 @@ export function kFromXY(x, y) {
 
 /**
  * @param {bigint} amount
- * @param {number} fee
+ * @param {number} feeBp
  * @returns {bigint}
  */
-export function calculateFee(amount, fee) {
-    const ret = wasm.calculateFee(amount, fee);
-    if (ret[2]) {
-        throw takeFromExternrefTable0(ret[1]);
-    }
-    return takeFromExternrefTable0(ret[0]);
+export function calculateFee(amount, feeBp) {
+    const ret = wasm.calculateFee(amount, feeBp);
+    return ret;
 }
 
 /**
- * @param {bigint} token_balance
- * @param {bigint} virtuals_balance
+ * @param {bigint} xBalance
+ * @param {bigint} yBalance
  * @param {number} precision
  * @returns {bigint}
  */
-export function spotPriceToken(token_balance, virtuals_balance, precision) {
-    const ret = wasm.spotPriceToken(token_balance, virtuals_balance, precision);
+export function spotPrice(xBalance, yBalance, precision) {
+    const ret = wasm.spotPrice(xBalance, yBalance, precision);
     if (ret[2]) {
         throw takeFromExternrefTable0(ret[1]);
     }
@@ -141,13 +138,13 @@ export function spotPriceToken(token_balance, virtuals_balance, precision) {
 }
 
 /**
- * @param {bigint} token_balance
- * @param {bigint} virtuals_balance
- * @param {number} precision
+ * @param {bigint} xBalance
+ * @param {bigint} yBalance
+ * @param {bigint} xIn
  * @returns {bigint}
  */
-export function spotPriceVirtuals(token_balance, virtuals_balance, precision) {
-    const ret = wasm.spotPriceVirtuals(token_balance, virtuals_balance, precision);
+export function swapIn(xBalance, yBalance, xIn) {
+    const ret = wasm.swapIn(xBalance, yBalance, xIn);
     if (ret[2]) {
         throw takeFromExternrefTable0(ret[1]);
     }
@@ -155,179 +152,163 @@ export function spotPriceVirtuals(token_balance, virtuals_balance, precision) {
 }
 
 /**
- * @param {bigint} token_balance
- * @param {bigint} virtuals_balance
- * @param {bigint} buy_amount
+ * @param {bigint} xBalance
+ * @param {bigint} yBalance
+ * @param {bigint} xIn
+ * @param {number} feeBp
+ * @param {boolean} xIsVirtuals
+ * @returns {SwapInResult}
+ */
+export function swapInWithFee(xBalance, yBalance, xIn, feeBp, xIsVirtuals) {
+    const ret = wasm.swapInWithFee(xBalance, yBalance, xIn, feeBp, xIsVirtuals);
+    if (ret[2]) {
+        throw takeFromExternrefTable0(ret[1]);
+    }
+    return SwapInResult.__wrap(ret[0]);
+}
+
+/**
+ * @param {bigint} xBalance
+ * @param {bigint} yBalance
+ * @param {bigint} xOut
  * @returns {bigint}
  */
-export function buyToken(token_balance, virtuals_balance, buy_amount) {
-    const ret = wasm.buyToken(token_balance, virtuals_balance, buy_amount);
+export function swapOut(xBalance, yBalance, xOut) {
+    const ret = wasm.swapOut(xBalance, yBalance, xOut);
     if (ret[2]) {
         throw takeFromExternrefTable0(ret[1]);
     }
-    return takeFromExternrefTable0(ret[0]);
+    return BigInt.asUintN(64, ret[0]);
 }
 
 /**
- * @param {bigint} token_balance
- * @param {bigint} virtuals_balance
- * @param {bigint} sell_amount
- * @returns {bigint}
+ * @param {bigint} xBalance
+ * @param {bigint} yBalance
+ * @param {bigint} xOut
+ * @param {number} feeBp
+ * @param {boolean} xIsVirtuals
+ * @returns {SwapOutResult}
  */
-export function sellToken(token_balance, virtuals_balance, sell_amount) {
-    const ret = wasm.sellToken(token_balance, virtuals_balance, sell_amount);
+export function swapOutWithFee(xBalance, yBalance, xOut, feeBp, xIsVirtuals) {
+    const ret = wasm.swapOutWithFee(xBalance, yBalance, xOut, feeBp, xIsVirtuals);
     if (ret[2]) {
         throw takeFromExternrefTable0(ret[1]);
     }
-    return takeFromExternrefTable0(ret[0]);
+    return SwapOutResult.__wrap(ret[0]);
 }
 
 /**
- * @param {bigint} token_balance
- * @param {bigint} virtuals_balance
- * @param {bigint} buy_amount
- * @param {number} fee
- * @returns {SwapResult}
- */
-export function buyTokenWithFee(token_balance, virtuals_balance, buy_amount, fee) {
-    const ret = wasm.buyTokenWithFee(token_balance, virtuals_balance, buy_amount, fee);
-    if (ret[2]) {
-        throw takeFromExternrefTable0(ret[1]);
-    }
-    return SwapResult.__wrap(ret[0]);
-}
-
-/**
- * @param {bigint} token_balance
- * @param {bigint} virtuals_balance
- * @param {bigint} sell_amount
- * @param {number} fee
- * @returns {SwapResult}
- */
-export function sellTokenWithFee(token_balance, virtuals_balance, sell_amount, fee) {
-    const ret = wasm.sellTokenWithFee(token_balance, virtuals_balance, sell_amount, fee);
-    if (ret[2]) {
-        throw takeFromExternrefTable0(ret[1]);
-    }
-    return SwapResult.__wrap(ret[0]);
-}
-
-/**
- * @param {bigint} token_balance
- * @param {bigint} virtuals_balance
- * @param {bigint} buy_amount
- * @param {number} fee
- * @returns {SwapResult}
- */
-export function reverseBuyTokenWithFee(token_balance, virtuals_balance, buy_amount, fee) {
-    const ret = wasm.reverseBuyTokenWithFee(token_balance, virtuals_balance, buy_amount, fee);
-    if (ret[2]) {
-        throw takeFromExternrefTable0(ret[1]);
-    }
-    return SwapResult.__wrap(ret[0]);
-}
-
-/**
- * @param {bigint} token_balance
- * @param {bigint} virtuals_balance
- * @param {bigint} sell_amount
- * @param {number} fee
- * @returns {SwapResult}
- */
-export function reverseSellTokenWithFee(token_balance, virtuals_balance, sell_amount, fee) {
-    const ret = wasm.reverseSellTokenWithFee(token_balance, virtuals_balance, sell_amount, fee);
-    if (ret[2]) {
-        throw takeFromExternrefTable0(ret[1]);
-    }
-    return SwapResult.__wrap(ret[0]);
-}
-
-/**
- * @enum {0 | 1 | 2 | 3}
+ * @enum {0 | 1 | 2}
  */
 export const CurveError = Object.freeze({
     ArithmeticOverflow: 0, "0": "ArithmeticOverflow",
-    RatioExceeded: 1, "1": "RatioExceeded",
-    InvalidSupply: 2, "2": "InvalidSupply",
-    ZeroAmount: 3, "3": "ZeroAmount",
+    InvalidSupply: 1, "1": "InvalidSupply",
+    ZeroAmount: 2, "2": "ZeroAmount",
 });
 
-const SwapResultFinalization = (typeof FinalizationRegistry === 'undefined')
+const SwapInResultFinalization = (typeof FinalizationRegistry === 'undefined')
     ? { register: () => {}, unregister: () => {} }
-    : new FinalizationRegistry(ptr => wasm.__wbg_swapresult_free(ptr >>> 0, 1));
+    : new FinalizationRegistry(ptr => wasm.__wbg_swapinresult_free(ptr >>> 0, 1));
 
-export class SwapResult {
+export class SwapInResult {
 
     static __wrap(ptr) {
         ptr = ptr >>> 0;
-        const obj = Object.create(SwapResult.prototype);
+        const obj = Object.create(SwapInResult.prototype);
         obj.__wbg_ptr = ptr;
-        SwapResultFinalization.register(obj, obj.__wbg_ptr, obj);
+        SwapInResultFinalization.register(obj, obj.__wbg_ptr, obj);
         return obj;
     }
 
     __destroy_into_raw() {
         const ptr = this.__wbg_ptr;
         this.__wbg_ptr = 0;
-        SwapResultFinalization.unregister(this);
+        SwapInResultFinalization.unregister(this);
         return ptr;
     }
 
     free() {
         const ptr = this.__destroy_into_raw();
-        wasm.__wbg_swapresult_free(ptr, 0);
+        wasm.__wbg_swapinresult_free(ptr, 0);
     }
     /**
      * @returns {bigint}
      */
-    get virtuals_amount() {
-        const ret = wasm.__wbg_get_swapresult_virtuals_amount(this.__wbg_ptr);
+    get yOut() {
+        const ret = wasm.__wbg_get_swapinresult_yOut(this.__wbg_ptr);
         return BigInt.asUintN(64, ret);
     }
     /**
      * @param {bigint} arg0
      */
-    set virtuals_amount(arg0) {
-        wasm.__wbg_set_swapresult_virtuals_amount(this.__wbg_ptr, arg0);
+    set yOut(arg0) {
+        wasm.__wbg_set_swapinresult_yOut(this.__wbg_ptr, arg0);
     }
     /**
      * @returns {bigint}
      */
-    get token_amount() {
-        const ret = wasm.__wbg_get_swapresult_token_amount(this.__wbg_ptr);
+    get fee() {
+        const ret = wasm.__wbg_get_swapinresult_fee(this.__wbg_ptr);
         return BigInt.asUintN(64, ret);
     }
     /**
      * @param {bigint} arg0
      */
-    set token_amount(arg0) {
-        wasm.__wbg_set_swapresult_token_amount(this.__wbg_ptr, arg0);
+    set fee(arg0) {
+        wasm.__wbg_set_swapinresult_fee(this.__wbg_ptr, arg0);
+    }
+}
+
+const SwapOutResultFinalization = (typeof FinalizationRegistry === 'undefined')
+    ? { register: () => {}, unregister: () => {} }
+    : new FinalizationRegistry(ptr => wasm.__wbg_swapoutresult_free(ptr >>> 0, 1));
+
+export class SwapOutResult {
+
+    static __wrap(ptr) {
+        ptr = ptr >>> 0;
+        const obj = Object.create(SwapOutResult.prototype);
+        obj.__wbg_ptr = ptr;
+        SwapOutResultFinalization.register(obj, obj.__wbg_ptr, obj);
+        return obj;
+    }
+
+    __destroy_into_raw() {
+        const ptr = this.__wbg_ptr;
+        this.__wbg_ptr = 0;
+        SwapOutResultFinalization.unregister(this);
+        return ptr;
+    }
+
+    free() {
+        const ptr = this.__destroy_into_raw();
+        wasm.__wbg_swapoutresult_free(ptr, 0);
     }
     /**
      * @returns {bigint}
      */
-    get fee_amount() {
-        const ret = wasm.__wbg_get_swapresult_fee_amount(this.__wbg_ptr);
+    get yIn() {
+        const ret = wasm.__wbg_get_swapinresult_yOut(this.__wbg_ptr);
         return BigInt.asUintN(64, ret);
     }
     /**
      * @param {bigint} arg0
      */
-    set fee_amount(arg0) {
-        wasm.__wbg_set_swapresult_fee_amount(this.__wbg_ptr, arg0);
+    set yIn(arg0) {
+        wasm.__wbg_set_swapinresult_yOut(this.__wbg_ptr, arg0);
     }
     /**
      * @returns {bigint}
      */
-    get total_virtuals_amount() {
-        const ret = wasm.__wbg_get_swapresult_total_virtuals_amount(this.__wbg_ptr);
+    get fee() {
+        const ret = wasm.__wbg_get_swapinresult_fee(this.__wbg_ptr);
         return BigInt.asUintN(64, ret);
     }
     /**
      * @param {bigint} arg0
      */
-    set total_virtuals_amount(arg0) {
-        wasm.__wbg_set_swapresult_total_virtuals_amount(this.__wbg_ptr, arg0);
+    set fee(arg0) {
+        wasm.__wbg_set_swapinresult_fee(this.__wbg_ptr, arg0);
     }
 }
 
@@ -380,11 +361,6 @@ export function __wbindgen_init_externref_table() {
     table.set(offset + 2, true);
     table.set(offset + 3, false);
     ;
-};
-
-export function __wbindgen_number_new(arg0) {
-    const ret = arg0;
-    return ret;
 };
 
 export function __wbindgen_throw(arg0, arg1) {

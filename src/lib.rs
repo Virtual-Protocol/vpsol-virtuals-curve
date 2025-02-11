@@ -11,12 +11,27 @@ extern crate console_error_panic_hook;
 use std::panic;
 
 #[derive(Debug)]
-#[cfg_attr(target_arch = "wasm32", derive(serde::Serialize, serde::Deserialize), wasm_bindgen)]
-pub struct SwapResult {
-    pub virtuals_amount: u64,
-    pub token_amount: u64,
-    pub fee_amount: u64,
-    pub total_virtuals_amount: u64
+#[cfg_attr(
+    target_arch = "wasm32",
+    derive(serde::Serialize, serde::Deserialize),
+    wasm_bindgen
+)]
+pub struct SwapInResult {
+    #[cfg_attr(target_arch = "wasm32", wasm_bindgen(js_name = "yOut"))]
+    pub y_out: u64,
+    pub fee: u64,
+}
+
+#[derive(Debug)]
+#[cfg_attr(
+    target_arch = "wasm32",
+    derive(serde::Serialize, serde::Deserialize),
+    wasm_bindgen
+)]
+pub struct SwapOutResult {
+    #[cfg_attr(target_arch = "wasm32", wasm_bindgen(js_name = "yIn"))]
+    pub y_in: u64,
+    pub fee: u64,
 }
 
 #[derive(Debug, Error)]
@@ -24,12 +39,10 @@ pub struct SwapResult {
 pub enum CurveError {
     #[error("Curve Arithmetic Overflow")]
     ArithmeticOverflow,
-    #[error("Asset Ratio Exceeded")]
-    RatioExceeded,
     #[error("Invalid Supply")]
     InvalidSupply,
     #[error("Zero Amount")]
-    ZeroAmount
+    ZeroAmount,
 }
 
 #[cfg(feature = "anchor")]
@@ -45,7 +58,6 @@ impl From<CurveError> for Error {
     }
 }
 
-
 #[cfg(target_arch = "wasm32")]
 #[wasm_bindgen(start)]
 fn init() {
@@ -53,202 +65,161 @@ fn init() {
 }
 
 /// K from XY
-/// 
+///
 /// Our static invariant calculation
 #[inline]
 pub fn k_from_xy_impl(x: u64, y: u64) -> Result<u128, CurveError> {
     if x == 0 || y == 0 {
         return Err(CurveError::ZeroAmount);
     }
-    Ok((x as u128).checked_mul(y as u128).ok_or(CurveError::ArithmeticOverflow)?)
+    Ok((x as u128)
+        .checked_mul(y as u128)
+        .ok_or(CurveError::ArithmeticOverflow)?)
 }
 
 /// # Spot Price
-/// 
+///
 /// Calculate spot price for a token in its opposing token
 #[inline]
 fn spot_price_impl(x: u64, y: u64, precision: u32) -> Result<u64, CurveError> {
     if x == 0 || y == 0 {
         return Err(CurveError::ZeroAmount);
     }
-    Ok(
-        u64::try_from(
-            (x as u128)
-            .checked_mul(precision as u128).ok_or(CurveError::ArithmeticOverflow)?
-            .checked_div(y as u128).ok_or(CurveError::ArithmeticOverflow)?
-            .checked_div(precision as u128).ok_or(CurveError::ArithmeticOverflow)?
-        ).map_err(|_| CurveError::ArithmeticOverflow)?
+    Ok(u64::try_from(
+        (x as u128)
+            .checked_mul(
+                10u128.pow(precision)
+            )
+            .ok_or(CurveError::ArithmeticOverflow)?
+            .checked_div(y as u128)
+            .ok_or(CurveError::ArithmeticOverflow)?
     )
+    .map_err(|_| CurveError::ArithmeticOverflow)?)
 }
 
-/// # Buy Token
-/// 
-/// Calculate amount of virtuals needed to buy tokens using constant product formula
 #[inline]
-fn buy_token_impl(token_balance: u64, virtuals_balance: u64, buy_amount: u64) -> Result<u64, CurveError> {
-    if buy_amount >= token_balance {
-        return Err(CurveError::ArithmeticOverflow);
-    }
-    
-    let numerator = (virtuals_balance as u128).checked_mul(buy_amount as u128)
-        .ok_or(CurveError::ArithmeticOverflow)?;
-    let denominator = token_balance.checked_sub(buy_amount)
-        .ok_or(CurveError::ArithmeticOverflow)? as u128;
-    
-    let amount = numerator.checked_div(denominator)
-        .ok_or(CurveError::ArithmeticOverflow)?;
-        
-    let amount: u64 = amount.try_into().map_err(|_| CurveError::ArithmeticOverflow)?;
-
-    if amount < 1 {
-        return Err(CurveError::ZeroAmount)
-    }
-
-    Ok(amount)
+fn calculate_fee_impl(amount: u64, fee_bp: u16) -> u64 {
+    let fee_bp = core::cmp::min(fee_bp, 100_00) as u128;
+    // None of these values can overflow so this math is safe
+    let fee: u64 = ((amount as u128) * fee_bp / 100_00) as u64;
+    core::cmp::max(1, fee)
 }
 
-/// # Reverse Buy Token
-/// 
-/// Calculate amount of tokens purchases for a certain amount of virtuals using constant product formula
+/// # Swap In
+///
+/// Swap amount of virtuals needed to buy tokens using constant product formula
 #[inline]
-fn reverse_buy_token_impl(token_balance: u64, virtuals_balance: u64, buy_amount: u64) -> Result<u64, CurveError> {
-    // 1. We start from K = XY (Constant = Token x Virtuals)
-    let k = k_from_xy_impl(token_balance, virtuals_balance)?;
-    // 2. We calculate the new balance of X (Tokens)
-    let new_virtuals_balance = (virtuals_balance as u128).checked_add(buy_amount as u128).ok_or(CurveError::ArithmeticOverflow)?;
-    // 3. We calculate the new balance of Y (Virtuals)
-    let new_token_balance: u64 = k.checked_div(new_virtuals_balance).ok_or(CurveError::ArithmeticOverflow)?.try_into().map_err(|_| CurveError::ArithmeticOverflow)?;
-    // 4. Return our amount by subtracting new_virtuals_balance from old.
-    let amount = token_balance.checked_sub(new_token_balance).ok_or(CurveError::ArithmeticOverflow.into())?;
+fn swap_in_impl(x: u64, y: u64, x_in: u64) -> Result<u64, CurveError> {
+    // Calculate constant k = x * y
+    let k = k_from_xy_impl(x, y)?;
 
-    if amount < 1 {
-        return Err(CurveError::ZeroAmount)
-    }
+    // Calculate new x after input amount is added
+    let new_x = x.checked_add(x_in).ok_or(CurveError::ArithmeticOverflow)?;
 
-    Ok(amount)
+    // Calculate new y using k = xy formula
+    // new_y = k / new_x
+    let new_y = k
+        .checked_div(new_x as u128)
+        .ok_or(CurveError::ArithmeticOverflow)?;
+
+    // Convert new_y to u64, checking for overflow
+    let new_y: u64 = new_y
+        .try_into()
+        .map_err(|_| CurveError::ArithmeticOverflow)?;
+
+    // Calculate output amount (y_out = y - new_y)
+    let y_out = y.checked_sub(new_y).ok_or(CurveError::ArithmeticOverflow)?;
+
+    Ok(y_out)
 }
 
-/// # Sell Token
-/// 
-/// Calculate amount of virtuals received when selling tokens using constant product formula
+/// # Swap Out
+///
+/// Calculate input amount needed when swapping out x_out tokens
 #[inline]
-fn sell_token_impl(token_balance: u64, virtuals_balance: u64, sell_amount: u64) -> Result<u64, CurveError> {
+fn swap_out_impl(x: u64, y: u64, x_out: u64) -> Result<u64, CurveError> {
+    // Calculate k = x * y first to maintain precision
+    let k = k_from_xy_impl(x, y)?;
 
-    let numerator = (virtuals_balance as u128).checked_mul(sell_amount as u128)
-        .ok_or(CurveError::ArithmeticOverflow)?;
-    let denominator = (token_balance as u128).checked_add(sell_amount as u128)
-        .ok_or(CurveError::ArithmeticOverflow)?;
-    
-    let amount = numerator.checked_div(denominator)
-        .ok_or(CurveError::ArithmeticOverflow)? as u64;
-    // // 1. We start from K = XY (Constant = Token x Virtuals)
-    // let k = k_from_xy_impl(token_balance, virtuals_balance)?;
-    // // 2. We calculate the new balance of X (Tokens)
-    // let new_token_balance = token_balance.checked_add(sell_amount).ok_or(CurveError::ArithmeticOverflow)? as u128;
-    // // 3. We calculate the new balance of Y (Virtuals)
-    // let new_virtuals_balance: u64 = k.checked_div(new_token_balance)
-    //     .ok_or(CurveError::ArithmeticOverflow)?
-    //     .try_into()
-    //     .map_err(|_| CurveError::ArithmeticOverflow)?;
-    // // 4. Return our amount by subtracting new_virtuals_balance from old.
-    // let amount = virtuals_balance.checked_sub(new_virtuals_balance).ok_or(CurveError::ArithmeticOverflow.into())?;
+    // Calculate new_x = x - x_out
+    let new_x = x.checked_sub(x_out).ok_or(CurveError::ArithmeticOverflow)?;
 
-    if amount < 1 {
-        return Err(CurveError::ZeroAmount)
-    }
-    
-    Ok(amount)
-}
-
-/// # Reverse Sell Token
-/// 
-/// Calculate amount of tokens you would need to sell to receive a certain amount or virtuals using constant product formula
-#[inline]
-fn reverse_sell_token_impl(token_balance: u64, virtuals_balance: u64, sell_amount: u64) -> Result<u64, CurveError> {
-    // 1. We start from K = XY (Constant = Token x Virtuals)
-    let k = k_from_xy_impl(token_balance, virtuals_balance)?;
-    // 2. We calculate the new balance of X (Tokens)
-    let new_virtuals_balance = virtuals_balance.checked_sub(sell_amount).ok_or(CurveError::ArithmeticOverflow)? as u128;
-    // 3. We calculate the new balance of Y (Virtuals)
-    let new_token_balance: u64 = k.checked_div(new_virtuals_balance)
+    // Calculate new_y = ceiling(k / new_x) to ensure sufficient input
+    // We add (new_x - 1) to k before dividing to implement ceiling division
+    // while maintaining consistent rounding direction
+    let new_y = k
+        .checked_add(new_x as u128 - 1)
         .ok_or(CurveError::ArithmeticOverflow)?
+        .checked_div(new_x as u128)
+        .ok_or(CurveError::ArithmeticOverflow)?;
+
+    // Ensure new_y doesn't exceed u64::MAX
+    let new_y: u64 = new_y
         .try_into()
         .map_err(|_| CurveError::ArithmeticOverflow)?;
-    // 4. Return our amount by subtracting new_virtuals_balance from old.
-    let amount = new_token_balance.checked_sub(token_balance).ok_or(CurveError::ArithmeticOverflow.into())?;
 
-    if amount < 1 {
-        return Err(CurveError::ZeroAmount)
-    }
-    
-    Ok(amount)
+    // Calculate y_in = new_y - y
+    let y_in = new_y.checked_sub(y).ok_or(CurveError::ArithmeticOverflow)?;
+
+    Ok(y_in)
 }
 
+/// # Swap In
+///
+/// Swap in amount of token X
 #[inline]
-fn calculate_fee_impl(amount: u64, fee: u16) -> Result<u64, CurveError> {
-    let fee: u64 = (amount as u128)
-        .checked_mul(fee as u128).ok_or(CurveError::ArithmeticOverflow)?
-        .saturating_div(10_000u128)
-        .try_into()
-        .map_err(|_| CurveError::ArithmeticOverflow)?;
-    Ok(fee)
+fn swap_in_with_fee_impl(
+    x: u64,
+    y: u64,
+    x_in: u64,
+    fee_bp: u16,
+    x_is_virtuals: bool,
+) -> Result<SwapInResult, CurveError> {
+    let (fee, y_out) = if x_is_virtuals {
+        // Take fees before swap if X is virtuals
+        let fee = calculate_fee_impl(x_in, fee_bp);
+        let x_in_sub_fee = x_in.saturating_sub(fee);
+        let y_out = swap_in_impl(x, y, x_in_sub_fee)?;
+        (fee, y_out)
+    } else {
+        let y_out_pre_fee = swap_in_impl(x, y, x_in)?;
+        // Otherwise, take fees after swap if X is virtuals
+        let fee = calculate_fee_impl(y_out_pre_fee, fee_bp);
+        let y_out = y_out_pre_fee.saturating_sub(fee);
+        (fee, y_out)
+    };
+
+    Ok(SwapInResult { y_out, fee })
 }
 
-/// # Buy Token With Fee
-/// 
-/// Calculate the amount, fee and total in virtuals a user must pay to buy a certain amount of tokens
+/// # Swap Out
+///
+/// Swap out amount of token X
 #[inline]
-fn buy_token_with_fee_impl(token_balance: u64, virtuals_balance: u64, buy_amount: u64, fee_bp: u16) -> Result<SwapResult, CurveError> {
-    let virtuals_amount = buy_token_impl(token_balance, virtuals_balance, buy_amount)?;
-    let fee_amount = calculate_fee_impl(virtuals_amount, fee_bp)?;
-    let total_virtuals_amount = virtuals_amount.checked_add(fee_amount).ok_or(CurveError::ArithmeticOverflow)?;
-    Ok(SwapResult { token_amount: buy_amount, fee_amount, virtuals_amount, total_virtuals_amount })
-}
+fn swap_out_with_fee_impl(
+    x: u64,
+    y: u64,
+    x_out: u64,
+    fee_bp: u16,
+    x_is_virtuals: bool,
+) -> Result<SwapOutResult, CurveError> {
+    let (y_in, fee) = if x_is_virtuals {
+        // If X is virtuals, add fee first
+        let fee = calculate_fee_impl(x_out, fee_bp);
+        let x_out_plus_fee = x_out
+            .checked_add(fee)
+            .ok_or(CurveError::ArithmeticOverflow)?;
+        let y_in = swap_out_impl(x, y, x_out_plus_fee)?;
+        (y_in, fee)
+    } else {
+        // If X is not virtuals, add fee first
+        let y_in_sub_fee = swap_out_impl(x, y, x_out)?;
+        let fee = calculate_fee_impl(y_in_sub_fee, fee_bp);
+        let y_in = y_in_sub_fee.saturating_sub(fee);
+        (y_in, fee)
+    };
 
-/// # Sell Token With Fee
-/// 
-/// Calculate the amount, fee and total in virtuals a user will receive for selling a certain amount of tokens
-#[inline]
-fn sell_token_with_fee_impl(token_balance: u64, virtuals_balance: u64, sell_amount: u64, fee_bp: u16) -> Result<SwapResult, CurveError> {
-    let total_virtuals_amount = sell_token_impl(token_balance, virtuals_balance, sell_amount)?;
-    let fee_amount = calculate_fee_impl(total_virtuals_amount, fee_bp)?;
-    let virtuals_amount = total_virtuals_amount.checked_sub(fee_amount).ok_or(CurveError::ArithmeticOverflow)?;
-    Ok(SwapResult { token_amount: sell_amount, fee_amount, virtuals_amount, total_virtuals_amount })
-}
-
-/// # Reverse Buy Token With Fee
-/// 
-/// Calculate the fee paid and token amount received by a user for a particular amount of virtuals
-#[inline]
-fn reverse_buy_token_with_fee_impl(token_balance: u64, virtuals_balance: u64, buy_amount: u64, fee_bp: u16) -> Result<SwapResult, CurveError> {
-    let fee_amount = calculate_fee_impl(buy_amount, fee_bp)?;
-    let virtuals_amount = buy_amount.checked_sub(fee_amount).ok_or(CurveError::ArithmeticOverflow)?;
-    let token_amount = reverse_buy_token_impl(token_balance, virtuals_balance, virtuals_amount)?;
-    Ok(SwapResult {
-        token_amount,
-        fee_amount,
-        virtuals_amount,
-        total_virtuals_amount: buy_amount
-    })
-}
-
-/// # Reverse Sell Token With Fee
-/// 
-/// Calculate the fee paid and token amount required for a user to receive a particular amount of virtuals
-#[inline]
-fn reverse_sell_token_with_fee_impl(token_balance: u64, virtuals_balance: u64, sell_amount: u64, fee_bp: u16) -> Result<SwapResult, CurveError> {
-    // Calculate the fee on top of the sell amount we want to receive
-    let fee_amount = calculate_fee_impl(sell_amount, fee_bp)?;
-    // Calculate the total amount of virtuals we want to get out, including the fee
-    let total_virtuals_amount = sell_amount.checked_add(fee_amount).ok_or(CurveError::ArithmeticOverflow)?;
-    // Calculate the number of tokens we'd need to see for our desired virtuals amount
-    let token_amount = reverse_sell_token_impl(token_balance, virtuals_balance, total_virtuals_amount)?;
-    Ok(SwapResult {
-        token_amount,
-        fee_amount,
-        virtuals_amount: sell_amount,
-        total_virtuals_amount
-    })
+    Ok(SwapOutResult { fee, y_in })
 }
 
 // Native interfaces
@@ -258,186 +229,233 @@ pub fn k_from_xy(x: u64, y: u64) -> Result<u128, CurveError> {
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-pub fn calculate_fee(amount: u64, fee: u16) -> Result<u64, CurveError> {
-    calculate_fee_impl(amount, fee)
+pub fn calculate_fee(amount: u64, fee_bp: u16) -> u64 {
+    calculate_fee_impl(amount, fee_bp)
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-pub fn spot_price_token(token_balance: u64, virtuals_balance: u64, precision: u32) -> Result<u64, CurveError> {
-    spot_price_impl(token_balance, virtuals_balance, precision)
+pub fn spot_price(x: u64, y: u64, precision: u32) -> Result<u64, CurveError> {
+    spot_price_impl(x, y, precision)
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-pub fn spot_price_virtuals(token_balance: u64, virtuals_balance: u64, precision: u32) -> Result<u64, CurveError> {
-    spot_price_impl(virtuals_balance, token_balance, precision)
+pub fn swap_in(x_balance: u64, y_balance: u64, x_in: u64) -> Result<u64, CurveError> {
+    swap_in_impl(x_balance, y_balance, x_in)
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-pub fn buy_token(token_balance: u64, virtuals_balance: u64, buy_amount: u64) -> Result<u64, CurveError> {
-    buy_token_impl(token_balance, virtuals_balance, buy_amount)
+pub fn swap_in_with_fee(
+    x_balance: u64,
+    y_balance: u64,
+    x_in: u64,
+    fee_bp: u16,
+    x_is_virtuals: bool,
+) -> Result<SwapInResult, CurveError> {
+    swap_in_with_fee_impl(x_balance, y_balance, x_in, fee_bp, x_is_virtuals)
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-pub fn sell_token(token_balance: u64, virtuals_balance: u64, sell_amount: u64) -> Result<u64, CurveError> {
-    sell_token_impl(token_balance, virtuals_balance, sell_amount)
+pub fn swap_out(x_balance: u64, y_balance: u64, x_out: u64) -> Result<u64, CurveError> {
+    swap_out_impl(x_balance, y_balance, x_out)
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-pub fn buy_token_with_fee(token_balance: u64, virtuals_balance: u64, buy_amount: u64, fee: u16) -> Result<SwapResult, CurveError> {
-    buy_token_with_fee_impl(token_balance, virtuals_balance, buy_amount, fee)
-}
-
-#[cfg(not(target_arch = "wasm32"))]
-pub fn sell_token_with_fee(token_balance: u64, virtuals_balance: u64, sell_amount: u64, fee: u16) -> Result<SwapResult, CurveError> {
-    sell_token_with_fee_impl(token_balance, virtuals_balance, sell_amount, fee)
-}
-
-#[cfg(not(target_arch = "wasm32"))]
-pub fn reverse_buy_token_with_fee(token_balance: u64, virtuals_balance: u64, buy_amount: u64, fee: u16) -> Result<SwapResult, CurveError> {
-    reverse_buy_token_with_fee_impl(token_balance, virtuals_balance, buy_amount, fee)
-}
-
-#[cfg(not(target_arch = "wasm32"))]
-pub fn reverse_sell_token_with_fee(token_balance: u64, virtuals_balance: u64, sell_amount: u64, fee: u16) -> Result<SwapResult, CurveError> {
-    reverse_sell_token_with_fee_impl(token_balance, virtuals_balance, sell_amount, fee)
+pub fn swap_out_with_fee(
+    x_balance: u64,
+    y_balance: u64,
+    x_out: u64,
+    fee_bp: u16,
+    x_is_virtuals: bool,
+) -> Result<SwapOutResult, CurveError> {
+    swap_out_with_fee_impl(x_balance, y_balance, x_out, fee_bp, x_is_virtuals)
 }
 
 // Wasm interfaces
 #[cfg(target_arch = "wasm32")]
-#[wasm_bindgen(js_name = kFromXY)]
+#[wasm_bindgen(js_name = "kFromXY")]
 pub fn k_from_xy(x: u64, y: u64) -> Result<js_sys::BigInt, JsError> {
-    Ok(k_from_xy_impl(x, y).map_err(|e| JsError::new(&e.to_string()))?.into())
+    Ok(k_from_xy_impl(x, y)
+        .map_err(|e| JsError::new(&e.to_string()))?
+        .into())
 }
 
 #[cfg(target_arch = "wasm32")]
-#[wasm_bindgen(js_name = calculateFee)]
-pub fn calculate_fee(amount: u64, fee: u16) -> Result<js_sys::BigInt, JsError> {
-    Ok(calculate_fee_impl(amount, fee).map_err(|e| JsError::new(&e.to_string()))?.into())
+#[wasm_bindgen(js_name = "calculateFee")]
+pub fn calculate_fee(
+    amount: u64,
+    #[wasm_bindgen(js_name = "feeBp")] fee_bp: u16,
+) -> js_sys::BigInt {
+    calculate_fee_impl(amount, fee_bp).into()
 }
 
 #[cfg(target_arch = "wasm32")]
-#[wasm_bindgen(js_name = spotPriceToken)]
-pub fn spot_price_token(token_balance: u64, virtuals_balance: u64, precision: u32) -> Result<js_sys::BigInt, CurveError> {
-    Ok(spot_price_impl(token_balance, virtuals_balance, precision)?.into())
+#[wasm_bindgen(js_name = "spotPrice")]
+pub fn spot_price(
+    #[wasm_bindgen(js_name = "xBalance")] x_balance: u64,
+    #[wasm_bindgen(js_name = "yBalance")] y_balance: u64,
+    precision: u32,
+) -> Result<js_sys::BigInt, JsError> {
+    Ok(spot_price_impl(x_balance, y_balance, precision)?.into())
 }
 
 #[cfg(target_arch = "wasm32")]
-#[wasm_bindgen(js_name = spotPriceVirtuals)]
-pub fn spot_price_virtuals(token_balance: u64, virtuals_balance: u64, precision: u32) -> Result<js_sys::BigInt, CurveError> {
-    Ok(spot_price_impl(virtuals_balance, token_balance, precision)?.into())
+#[wasm_bindgen(js_name = "swapIn")]
+pub fn swap_in(
+    #[wasm_bindgen(js_name = "xBalance")] x_balance: u64,
+    #[wasm_bindgen(js_name = "yBalance")] y_balance: u64,
+    #[wasm_bindgen(js_name = "xIn")] x_in: u64,
+) -> Result<js_sys::BigInt, JsError> {
+    Ok(swap_in_impl(x_balance, y_balance, x_in)
+        .map_err(|e| JsError::new(&e.to_string()))?
+        .into())
 }
 
 #[cfg(target_arch = "wasm32")]
-#[wasm_bindgen(js_name = buyToken)]
-pub fn buy_token(token_balance: u64, virtuals_balance: u64, buy_amount: u64) -> Result<js_sys::BigInt, JsError> {
-    Ok(buy_token_impl(token_balance, virtuals_balance, buy_amount).map_err(|e| JsError::new(&e.to_string()))?.into())
+#[wasm_bindgen(js_name = "swapInWithFee")]
+pub fn swap_in_with_fee(
+    #[wasm_bindgen(js_name = "xBalance")] x_balance: u64,
+    #[wasm_bindgen(js_name = "yBalance")] y_balance: u64,
+    #[wasm_bindgen(js_name = "xIn")] x_in: u64,
+    #[wasm_bindgen(js_name = "feeBp")] fee_bp: u16,
+    #[wasm_bindgen(js_name = "xIsVirtuals")] x_is_virtuals: bool,
+) -> Result<SwapInResult, JsError> {
+    Ok(
+        swap_in_with_fee_impl(x_balance, y_balance, x_in, fee_bp, x_is_virtuals)
+            .map_err(|e| JsError::new(&e.to_string()))?
+            .into(),
+    )
 }
 
 #[cfg(target_arch = "wasm32")]
-#[wasm_bindgen(js_name = sellToken)]
-pub fn sell_token(token_balance: u64, virtuals_balance: u64, sell_amount: u64) -> Result<js_sys::BigInt, JsError> {
-    Ok(sell_token_impl(token_balance, virtuals_balance, sell_amount).map_err(|e| JsError::new(&e.to_string()))?.into())
+#[wasm_bindgen(js_name = "swapOut")]
+pub fn swap_out(
+    #[wasm_bindgen(js_name = "xBalance")] x_balance: u64,
+    #[wasm_bindgen(js_name = "yBalance")] y_balance: u64,
+    #[wasm_bindgen(js_name = "xOut")] x_out: u64,
+) -> Result<u64, JsError> {
+    Ok(swap_out_impl(x_balance, y_balance, x_out)
+        .map_err(|e| JsError::new(&e.to_string()))?
+        .into())
 }
 
 #[cfg(target_arch = "wasm32")]
-#[wasm_bindgen(js_name = buyTokenWithFee)]
-pub fn buy_token_with_fee(token_balance: u64, virtuals_balance: u64, buy_amount: u64, fee: u16) -> Result<SwapResult, JsError> {
-    buy_token_with_fee_impl(token_balance, virtuals_balance, buy_amount, fee).map_err(|e| JsError::new(&e.to_string()))
-}
-
-#[cfg(target_arch = "wasm32")]
-#[wasm_bindgen(js_name = sellTokenWithFee)]
-pub fn sell_token_with_fee(token_balance: u64, virtuals_balance: u64, sell_amount: u64, fee: u16) -> Result<SwapResult, JsError> {
-    sell_token_with_fee_impl(token_balance, virtuals_balance, sell_amount, fee).map_err(|e| JsError::new(&e.to_string()))
-}
-
-#[cfg(target_arch = "wasm32")]
-#[wasm_bindgen(js_name = reverseBuyTokenWithFee)]
-pub fn reverse_buy_token_with_fee(token_balance: u64, virtuals_balance: u64, buy_amount: u64, fee: u16) -> Result<SwapResult, JsError> {
-    reverse_buy_token_with_fee_impl(token_balance, virtuals_balance, buy_amount, fee).map_err(|e| JsError::new(&e.to_string()))
-}
-
-#[cfg(target_arch = "wasm32")]
-#[wasm_bindgen(js_name = reverseSellTokenWithFee)]
-pub fn reverse_sell_token_with_fee(token_balance: u64, virtuals_balance: u64, sell_amount: u64, fee: u16) -> Result<SwapResult, JsError> {
-    reverse_sell_token_with_fee_impl(token_balance, virtuals_balance, sell_amount, fee).map_err(|e| JsError::new(&e.to_string()))
+#[wasm_bindgen(js_name = "swapOutWithFee")]
+pub fn swap_out_with_fee(
+    #[wasm_bindgen(js_name = "xBalance")] x_balance: u64,
+    #[wasm_bindgen(js_name = "yBalance")] y_balance: u64,
+    #[wasm_bindgen(js_name = "xOut")] x_out: u64,
+    #[wasm_bindgen(js_name = "feeBp")] fee_bp: u16,
+    #[wasm_bindgen(js_name = "xIsVirtuals")] x_is_virtuals: bool,
+) -> Result<SwapOutResult, JsError> {
+    swap_out_with_fee_impl(x_balance, y_balance, x_out, fee_bp, x_is_virtuals)
+        .map_err(|e| JsError::new(&e.to_string()))
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::{buy_token, buy_token_with_fee, reverse_buy_token_with_fee, reverse_sell_token_with_fee, sell_token_with_fee, SwapResult};
+    use crate::{
+        k_from_xy, spot_price, swap_in, swap_in_with_fee, swap_out, swap_out_with_fee, SwapInResult, SwapOutResult
+    };
+
     #[test]
-    fn swap() {
-        // Execute a buy
-        // K = 25*24 = 600
-        // X2 = 25
-        // Y2 = 600/25 = 24
-        // Y2 - Y = 4
-        let SwapResult { virtuals_amount, ..} = buy_token_with_fee(30, 20, 5, 0).unwrap();
-        assert_eq!(virtuals_amount, 4);
-        // Execute the reverse sell
-        // K = XY,
-        // 600 = 25/24
-        // X2 = 30
-        // Y2 = 600/30 = 20
-        // Y2 - Y = 4
-        let SwapResult { virtuals_amount, ..} = sell_token_with_fee(25, 24, 5, 0).unwrap();
-        assert_eq!(virtuals_amount, 4);
+    fn k_from_xy_test() {
+        assert_eq!(k_from_xy(20, 30).unwrap(), 600)
     }
 
     #[test]
-    fn reverse_swap() {
-        // Execute a reverse buy
-        // 600 = 30*20
-        // Y2 = 24
-        // X2 = 600/24 = 25
-        // X - X2 = 5
-        let SwapResult { token_amount, ..} = reverse_buy_token_with_fee(30, 20, 4, 0).unwrap();
-        assert_eq!(token_amount, 5);
-        // Execute a reverse sell
-        // 600 = 25*24
-        // Y2 = 20
-        // X2 = 600/20 = 30
-        // X2 - X = 5
-        let SwapResult { token_amount, ..} = reverse_sell_token_with_fee(25, 24, 4, 0).unwrap();
-        assert_eq!(token_amount, 5);
+    fn spot_price_test() {
+        assert_eq!(spot_price(30, 20, 6).unwrap(), 1500000)
     }
 
     #[test]
-    fn swap_with_fee() {
-        // Execute a sell
-        // K = XY,
-        // 600 = 20/30
-        // X2 = 25
-        // Y2 = 600/25 = 24
-        // Y - Y2 = 6
-        // 6 * 1667 / 10000 = 1
-        let SwapResult { virtuals_amount, fee_amount, .. } = sell_token_with_fee(20, 30, 5, 1667).unwrap();
+    fn swap_in_test() {
+        // K = 600, Y = 30, X = 20, X2 = 24
+        // Y2 = K/24 = 25 - 20 = 5
+        let virtuals_amount = swap_in(20, 30, 4).unwrap();
         assert_eq!(virtuals_amount, 5);
-        assert_eq!(fee_amount, 1);
-        // Execute a sell
-        // K = XY,
-        // 600 = 20/30
-        // X2 = 25
-        // Y2 = 600/25 = 24
-        // Y - Y2 = 6
-        // 6 * 1666 / 10000 = 0
-        let SwapResult { virtuals_amount, fee_amount, .. } = sell_token_with_fee(20, 30, 5, 1666).unwrap();
-        assert_eq!(virtuals_amount, 6);
-        assert_eq!(fee_amount, 0);
+
+        // K = 600, Y = 24, X = 25, X2 = 30
+        // Y2 = K/25 = 24 - 20 = 4
+        let virtuals_amount = swap_in(25, 24, 5).unwrap();
+        assert_eq!(virtuals_amount, 4);
+    }
+
+    #[test]
+    fn swap_out_test() {
+        // K = 600, Y = 25, X = 24, X2 = 20
+        // Y2 = K/20 = 30 - 25 = 5
+        let virtuals_amount = swap_out(24, 25, 4).unwrap();
+        assert_eq!(virtuals_amount, 5);
+
+        // K = 600, Y = 20, X = 30, X2 = 25
+        // Y2 = K/25 = 24 - 20 = 4
+        let virtuals_amount = swap_out(30, 20, 5).unwrap();
+        assert_eq!(virtuals_amount, 4);
+    }
+
+    #[test]
+    fn swap_in_with_zero_fee_test() {
+        // K = 600, Y = 30, X = 20, X2 = 24
+        // Y2 = K/24 = 25 - 20 = 5 - fee of 1 = 4
+        let SwapInResult { y_out, fee } = swap_in_with_fee(20, 30, 4, 0, false).unwrap();
+        assert_eq!(y_out, 4);
+        assert_eq!(fee, 1);
+    }
+
+    #[test]
+    fn swap_in_with_fee_test() {
+        // K = 600, Y = 30, X = 20, X2 = 24
+        // Y2 = K/24 = 25 - 20 = 5 - fee of 1 = 4
+        let SwapInResult { y_out, fee } = swap_in_with_fee(20, 30, 4, 1667, false).unwrap();
+        assert_eq!(y_out, 4);
+        assert_eq!(fee, 1);
+
+        // K = 600, Y = 24, X = 25, X2 = 30
+        // Y2 = K/30 = 24 - 20 = 4 - fee of 1 = 3
+        let SwapInResult { y_out, fee } = swap_in_with_fee(25, 24, 5, 1667, false).unwrap();
+        assert_eq!(y_out, 3);
+        assert_eq!(fee, 1);
+    }
+
+    #[test]
+    fn swap_out_with_fee_test() {
+        // K = 600, Y = 25, X = 24, X2 = 20
+        // Y2 = K/20 = 30 - 25 = 5 - 1 = 4
+        let SwapOutResult { y_in, fee } = swap_out_with_fee(24, 25, 4, 1667, false).unwrap();
+        assert_eq!(y_in, 4);
+        assert_eq!(fee, 1);
+
+        // K = 600, Y = 20, X = 30, X2 = 25
+        // Y2 = K/25 = 24 - 20 = 4 - 1 = 3
+        let SwapOutResult { y_in, fee } = swap_out_with_fee(30, 20, 5, 1667, false).unwrap();
+        assert_eq!(y_in, 3);
+        assert_eq!(fee, 1);
     }
 
     #[test]
     fn test_overflow() {
-        assert!(buy_token(u64::MAX, u64::MAX, u64::MAX).is_err());
+        assert!(swap_in(u64::MAX, u64::MAX, u64::MAX).is_err());
     }
 
     #[test]
     fn test_real_pool_values() {
-        let buy = buy_token_with_fee(1_000_000_000_000_000, 6_000_000_000_000, 20000000000000, 100).unwrap();
-        println!("{:#?}", buy);
-        let sell = sell_token_with_fee(980_000_000_000_000, 6_000_000_000_000 + buy.virtuals_amount, 20000000000000, 100).unwrap();
-        println!("{:#?}", sell);
-        assert_eq!(buy.virtuals_amount, sell.total_virtuals_amount)
+        let buy = swap_out_with_fee(
+            1_000_000_000_000_000,
+            6_000_000_000_000,
+            20_000_000_000_000,
+            100,
+            false,
+        )
+        .unwrap();
+        let sell = swap_in_with_fee(
+            980_000_000_000_000,
+            6_000_000_000_000 + buy.y_in + buy.fee, // We must add the fee here to get the correct reverse result
+            20_000_000_000_000,
+            100,
+            false,
+        )
+        .unwrap();
+
+        assert_eq!(buy.y_in, sell.y_out);
     }
 }
